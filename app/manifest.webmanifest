@@ -2,7 +2,7 @@
   "name": "VESTRA — Your AI Atelier",
   "short_name": "VESTRA",
   "description": "Photograph your wardrobe, get a complete look for any occasion, organize your closet and match your beauty. Hebrew and English.",
-  "id": "/vestra/",
+  "id": "./",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

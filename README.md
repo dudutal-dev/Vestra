@@ -1,0 +1,173 @@
+<div align="center">
+
+# VESTRA
+
+### Your AI Atelier · האטלייה האישי שלך
+
+**Photograph your wardrobe. Get a complete look for any occasion.**
+Built on a world-class fashion-stylist skill, updated to F/W 2026-27.
+
+`Hebrew + English` · `RTL + LTR` · `Mobile-first PWA` · `Runs entirely on your device`
+
+</div>
+
+---
+
+## What it is
+
+VESTRA is two things that work together:
+
+| | |
+|---|---|
+| 🧠 **The skill** — `skill/vestra-fashion-stylist/` | A senior personal-stylist expert for Claude: wardrobe cataloging, occasion dressing, colour analysis, body-shape balance, closet organization, beauty, and live trend intelligence. |
+| 📱 **The app** — `app/` | A mobile-first PWA that puts the skill in your pocket: shoot a garment, it gets catalogued automatically; pick an occasion, it builds a look **from clothes you actually own**. |
+
+---
+
+## Features
+
+### 📸 Shoot it, and it's catalogued
+Photograph any garment and Claude's vision identifies **category, subcategory, colour (with hex), pattern, fabric, texture, season, weight, formality (1-6), fit, neckline, sleeve, length, undertone, versatility score and trend status** — in Hebrew and English at once. Shoot several pieces in one frame and it returns them as separate items.
+
+### ✨ A complete look for any occasion
+30+ occasions from *errands* to *black tie*, with Israeli dress codes built in (synagogue, shiva, bar mitzvah, heatwave). Every look is assembled **only from your catalogued wardrobe** — never invented — and passes 7 quality gates before you see it:
+
+> existence · formality spread ≤ 2 levels · weather sanity · silhouette balance · ≤ 3 colour families · ≤ 3 points of interest · physically wearable
+
+Each look comes with a palette, the silhouette logic, **why it works**, a trend reference, one alternative, and a `🛒 GAP` list for anything missing — with a price estimate and a stand-in from your closet.
+
+### 👔 "What do I wear with this?"
+Pick one piece and get **three** complete outfits around it — *dressed down*, *everyday*, *dressed up*. The engine first classifies your anchor as a **statement**, a **neutral base**, or a **texture** piece, then builds accordingly.
+
+### 🚪 Closet organization from a photo
+Shoot your closet standing open. You get zone mapping with occupancy percentages, diagnosed problems (rod over 70% = creasing and invisibility; folded stacks over 5 = the bottom never gets worn), a step-by-step plan with time estimates, and storage recommendations — all following the **CCLS** method: Category → Colour → Length → Season.
+
+### 💄 Beauty & grooming
+Five makeup looks plus a grooming track, matched to the occasion, your undertone and skin depth, and the outfit's palette. Current to F/W 26-27: oxblood lips, deliberate imperfection, smudged smokey, monochromatic face, double cat-eye, cosmic highlighter.
+
+### 📊 Wardrobe health
+Distribution by category, formality, colour and season · single-colour dominance warnings · near-duplicate detection · your workhorse pieces · and the three purchases that would unlock the most new outfits.
+
+### 🌍 Genuinely bilingual
+Hebrew (RTL) and English (LTR) throughout — including the AI's own output, which is generated in both languages in a single call. Serif display type switches per script.
+
+### 🔌 Works without an API key
+No key? The built-in **rules engine** still builds looks, pairs items, and runs the health report locally — using the same scoring model as the skill. Cataloguing falls back to a full manual form. Add a key whenever you want automatic recognition.
+
+---
+
+## Privacy
+
+**There is no VESTRA server.** The app is static files.
+
+- Photos, wardrobe and looks live in **IndexedDB on your device**
+- Your profile and API key live in **localStorage on your device**
+- Your API key goes **directly to `api.anthropic.com`** and nowhere else
+- Export your whole closet to JSON at any time; erase everything with one button
+
+---
+
+## Quick start
+
+### Run it locally
+
+```bash
+git clone https://github.com/<your-username>/vestra.git
+cd vestra
+node tools/serve.js
+```
+
+Then open <http://localhost:4173>. No build step, no dependencies — it's plain ES modules.
+
+### Deploy to GitHub Pages
+
+Push to `main`. The included workflow publishes `app/` automatically.
+In your repo: **Settings → Pages → Source: GitHub Actions**.
+
+### Add your API key
+
+Get one at [console.anthropic.com](https://console.anthropic.com/settings/keys), then in the app: **Profile → Anthropic API key**.
+
+Model options: `claude-opus-5` (most capable, the default), `claude-sonnet-5` (fast and economical), `claude-haiku-4-5` (fastest).
+
+> **Cost note:** photos are compressed to 1280px / JPEG q0.85 before upload, which cuts image tokens by roughly 70% with no measurable loss in recognition quality.
+
+---
+
+## Install the skill for Claude
+
+Copy the skill folder into your Claude skills directory:
+
+```bash
+cp -r skill/vestra-fashion-stylist ~/.claude/skills/
+```
+
+Then just talk to it — in Hebrew or English:
+
+> *"מה ללבוש לחתונה בערב באוגוסט?"*
+> *"I have a navy blazer. Give me three ways to wear it."*
+> *"תסדר לי את הארון"*
+
+The skill activates on any wardrobe, styling, outfit, dress-code, or beauty question.
+
+---
+
+## Project layout
+
+```
+vestra/
+├── app/                          # the PWA — static, no build step
+│   ├── index.html
+│   ├── manifest.webmanifest
+│   ├── sw.js                     # offline shell (skipped on localhost)
+│   ├── css/
+│   │   ├── tokens.css            # design tokens — Cloud Dancer base + dark theme
+│   │   ├── base.css              # layout, RTL/LTR, app bar, tab bar
+│   │   ├── animations.css        # the motion library
+│   │   └── components.css        # cards, chips, sheets, look card, forms
+│   └── js/
+│       ├── app.js                # router + boot
+│       ├── state.js              # shared state + event bus
+│       ├── store.js              # IndexedDB wardrobe/looks + settings
+│       ├── i18n.js               # Hebrew/English dictionary
+│       ├── taxonomy.js           # categories, occasions, formality, palettes
+│       ├── ai.js                 # Claude client + prompts + image compression
+│       ├── stylist.js            # offline rules engine
+│       ├── ui.js                 # icons, toasts, sheets, sparkles
+│       └── views/                # home · wardrobe · capture · studio · closet · beauty · profile
+├── skill/vestra-fashion-stylist/
+│   ├── SKILL.md                  # the expert
+│   └── references/
+│       ├── body-and-color.md     # body shapes + the 12 colour seasons
+│       ├── occasions-playbook.md # 32 occasions, dressed for Israel
+│       ├── capsule-wardrobe.md   # 30-piece capsules + buying order
+│       ├── app-integration.md    # the JSON contract between skill and app
+│       └── trends-2026.md        # trend archive + refresh protocol
+└── tools/serve.js                # dev server
+```
+
+---
+
+## Staying current
+
+The skill carries a dated trend archive and a **refresh protocol** (SKILL.md § 8.2): when more than 90 days have passed, or you ask "what's trending now", it runs live searches across approved fashion sources, accepts a trend only when 2+ independent sources agree, filters it against your age, body and climate — then writes the update back into `references/trends-2026.md`.
+
+Current data: **August 2026** — F/W 2026-27 fashion month, Pantone 2026 *Cloud Dancer*, F/W 26-27 beauty.
+
+---
+
+## Design
+
+Editorial fashion system built on **Cloud Dancer** (Pantone's 2026 Colour of the Year) with an oxblood accent — the season's signature. Playfair Display / Frank Ruhl Libre for display, Inter / Assistant for text. Motion is choreographed rather than decorative: staggered reveals, a scanning sweep during AI analysis, sparkle bursts on completion, drag-to-dismiss sheets — all of it disabled under `prefers-reduced-motion`.
+
+---
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).
+
+<div align="center">
+
+**VESTRA** · Wear your best self.
+
+</div>

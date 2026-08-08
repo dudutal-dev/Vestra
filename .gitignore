@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs & temp
+*.log
+npm-debug.log*
+.cache/
+tmp/
+dist/
+
+# Local data — never commit a wardrobe export or an API key
+*.local
+.env
+.env.*
+vestra-closet-*.json
