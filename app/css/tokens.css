@@ -1,0 +1,129 @@
+/* ============================================================
+   VESTRA · Design Tokens
+   Editorial fashion system — Cloud Dancer (Pantone 2026) base
+   ============================================================ */
+
+:root {
+  /* ---------- Surfaces ---------- */
+  --cloud:        #FBFAF7;   /* Cloud Dancer — page base            */
+  --cloud-2:      #F4F1EA;   /* raised surface                      */
+  --cloud-3:      #EAE5DB;   /* sunken / hairline fill              */
+  --paper:        #FFFFFF;   /* cards                               */
+
+  /* ---------- Ink ---------- */
+  --ink:          #14110F;   /* headlines                           */
+  --ink-2:        #3D3733;   /* body                                */
+  --ink-3:        #7A716A;   /* secondary                           */
+  --ink-4:        #A99F95;   /* tertiary / placeholder              */
+  --line:         #E3DDD2;   /* hairlines                           */
+
+  /* ---------- Accents (F/W 26 palette) ---------- */
+  --oxblood:      #6E1F28;   /* signature accent — F/W26 lip story  */
+  --oxblood-soft: #A8535C;
+  --camel:        #C39A6B;
+  --sage:         #9AA989;
+  --cocoa:        #6B4F3F;
+  --sienna:       #B45E3C;
+  --lilac:        #B9A3C4;
+  --gold:         #C6A667;
+
+  /* ---------- Semantic ---------- */
+  --ok:           #4E7C59;
+  --warn:         #C08A2E;
+  --danger:       #B0453C;
+
+  /* ---------- Gradients ---------- */
+  --grad-hero:    linear-gradient(145deg, #FBFAF7 0%, #F2ECE2 45%, #E8DFD2 100%);
+  --grad-ink:     linear-gradient(135deg, #14110F 0%, #2E2723 100%);
+  --grad-lux:     linear-gradient(115deg, var(--oxblood) 0%, #8E3340 55%, var(--camel) 100%);
+  --grad-shimmer: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.75) 50%, transparent 80%);
+  --grad-scan:    linear-gradient(180deg, transparent, rgba(198,166,103,.55), transparent);
+
+  /* ---------- Type ---------- */
+  --f-display: "Playfair Display", "Frank Ruhl Libre", Georgia, "Times New Roman", serif;
+  --f-body:    "Inter", "Assistant", "Heebo", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --f-mono:    "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+
+  --t-xs:  0.6875rem;   /* 11 */
+  --t-sm:  0.8125rem;   /* 13 */
+  --t-md:  0.9375rem;   /* 15 */
+  --t-lg:  1.0625rem;   /* 17 */
+  --t-xl:  1.375rem;    /* 22 */
+  --t-2xl: 1.875rem;    /* 30 */
+  --t-3xl: 2.625rem;    /* 42 */
+  --t-4xl: 3.5rem;      /* 56 */
+
+  --track-wide: .18em;
+  --track-mid:  .08em;
+
+  /* ---------- Space ---------- */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 20px; --s6: 24px; --s7: 32px; --s8: 44px; --s9: 64px;
+
+  /* ---------- Radius ---------- */
+  --r-sm: 10px; --r-md: 16px; --r-lg: 24px; --r-xl: 32px; --r-full: 999px;
+
+  /* ---------- Elevation ---------- */
+  --e1: 0 1px 2px rgba(20,17,15,.05), 0 1px 1px rgba(20,17,15,.03);
+  --e2: 0 4px 14px rgba(20,17,15,.07), 0 1px 3px rgba(20,17,15,.04);
+  --e3: 0 12px 34px rgba(20,17,15,.10), 0 3px 8px rgba(20,17,15,.05);
+  --e4: 0 26px 60px rgba(20,17,15,.16), 0 6px 16px rgba(20,17,15,.07);
+  --e-glow: 0 0 0 1px rgba(198,166,103,.35), 0 10px 34px rgba(110,31,40,.16);
+
+  /* ---------- Motion ---------- */
+  --ease-out:   cubic-bezier(.22,.61,.36,1);
+  --ease-in:    cubic-bezier(.55,.06,.68,.19);
+  --ease-soft:  cubic-bezier(.34,1.16,.64,1);
+  --ease-lux:   cubic-bezier(.16,1,.3,1);
+  --d-fast: 180ms;
+  --d-mid:  340ms;
+  --d-slow: 620ms;
+  --d-lux:  900ms;
+
+  /* ---------- Layout ---------- */
+  --nav-h: 68px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  --max-w: 520px;
+}
+
+/* ============================================================
+   Dark theme — "After Hours"
+   ============================================================ */
+[data-theme="dark"] {
+  --cloud:   #100E0D;
+  --cloud-2: #191614;
+  --cloud-3: #241F1C;
+  --paper:   #1B1816;
+
+  --ink:   #F6F2EC;
+  --ink-2: #D6CEC4;
+  --ink-3: #9A9089;
+  --ink-4: #6B625B;
+  --line:  #2E2825;
+
+  --oxblood-soft: #C97883;
+  --grad-hero: linear-gradient(145deg, #100E0D 0%, #1D1917 50%, #251F1C 100%);
+  --grad-shimmer: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.10) 50%, transparent 80%);
+
+  --e1: 0 1px 2px rgba(0,0,0,.45);
+  --e2: 0 4px 16px rgba(0,0,0,.5);
+  --e3: 0 12px 36px rgba(0,0,0,.58);
+  --e4: 0 26px 64px rgba(0,0,0,.66);
+}
+
+/* ============================================================
+   Category accent chips
+   ============================================================ */
+[data-cat="top"]        { --cat: #6E8FB0; }
+[data-cat="bottom"]     { --cat: #7C6F9B; }
+[data-cat="dress"]      { --cat: #B47B96; }
+[data-cat="outerwear"]  { --cat: #6B4F3F; }
+[data-cat="shoes"]      { --cat: #C39A6B; }
+[data-cat="bag"]        { --cat: #9AA989; }
+[data-cat="accessory"]  { --cat: #C6A667; }
+[data-cat="jewelry"]    { --cat: #C6A667; }
+[data-cat="activewear"] { --cat: #5E9A8E; }
+[data-cat="swim"]       { --cat: #5FA3B8; }
+[data-cat="headwear"]   { --cat: #A8535C; }
+[data-cat="underlayer"] { --cat: #A99F95; }

@@ -1,0 +1,199 @@
+/* ============================================================
+   VESTRA · Motion Library
+   Runway-grade choreography
+   ============================================================ */
+
+/* ---------- View transitions ---------- */
+@keyframes viewIn {
+  from { opacity: 0; transform: translate3d(0, 18px, 0) scale(.985); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes viewOut {
+  to { opacity: 0; transform: translate3d(0, -12px, 0) scale(.99); filter: blur(4px); }
+}
+
+/* ---------- Staggered reveal ---------- */
+@keyframes riseIn {
+  from { opacity: 0; transform: translate3d(0, 26px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.reveal { animation: riseIn var(--d-slow) var(--ease-lux) both; }
+.reveal-1 { animation-delay: .05s } .reveal-2 { animation-delay: .11s }
+.reveal-3 { animation-delay: .17s } .reveal-4 { animation-delay: .23s }
+.reveal-5 { animation-delay: .29s } .reveal-6 { animation-delay: .35s }
+.reveal-7 { animation-delay: .41s } .reveal-8 { animation-delay: .47s }
+
+/* Auto-stagger for generated grids (up to 24 children) */
+.stagger > * { animation: riseIn var(--d-mid) var(--ease-lux) both; }
+.stagger > *:nth-child(1){animation-delay:.02s} .stagger > *:nth-child(2){animation-delay:.05s}
+.stagger > *:nth-child(3){animation-delay:.08s} .stagger > *:nth-child(4){animation-delay:.11s}
+.stagger > *:nth-child(5){animation-delay:.14s} .stagger > *:nth-child(6){animation-delay:.17s}
+.stagger > *:nth-child(7){animation-delay:.20s} .stagger > *:nth-child(8){animation-delay:.23s}
+.stagger > *:nth-child(9){animation-delay:.26s} .stagger > *:nth-child(10){animation-delay:.29s}
+.stagger > *:nth-child(11){animation-delay:.32s} .stagger > *:nth-child(12){animation-delay:.35s}
+.stagger > *:nth-child(n+13){animation-delay:.38s}
+
+/* ---------- Scroll-triggered ---------- */
+.on-scroll { opacity: 0; transform: translate3d(0, 30px, 0); }
+.on-scroll.is-in {
+  opacity: 1; transform: none;
+  transition: opacity var(--d-slow) var(--ease-lux), transform var(--d-slow) var(--ease-lux);
+}
+
+/* ---------- Letter-by-letter headline ---------- */
+.split-in > span {
+  display: inline-block;
+  animation: letterUp var(--d-slow) var(--ease-lux) both;
+}
+@keyframes letterUp {
+  from { opacity: 0; transform: translate3d(0, 42px, 0) rotate3d(1,0,0,45deg); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---------- Shimmer skeleton ---------- */
+.skeleton {
+  position: relative; overflow: hidden;
+  background: var(--cloud-3);
+  border-radius: var(--r-sm);
+}
+.skeleton::after {
+  content: ""; position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: var(--grad-shimmer);
+  animation: shimmer 1.5s var(--ease-out) infinite;
+}
+@keyframes shimmer { to { transform: translateX(100%); } }
+
+/* ---------- AI scan sweep (over captured photo) ---------- */
+.scanning { position: relative; overflow: hidden; }
+.scanning::before {
+  content: ""; position: absolute; inset-inline: 0; height: 34%;
+  background: var(--grad-scan);
+  animation: scanSweep 1.9s var(--ease-out) infinite;
+  z-index: 3; pointer-events: none;
+}
+.scanning::after {
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(198,166,103,.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(198,166,103,.16) 1px, transparent 1px);
+  background-size: 26px 26px;
+  animation: gridPulse 2.4s var(--ease-out) infinite;
+}
+@keyframes scanSweep { from { top: -34%; } to { top: 100%; } }
+@keyframes gridPulse { 0%,100% { opacity: .25 } 50% { opacity: .7 } }
+
+/* Corner brackets on the scan frame */
+.scan-frame::before, .scan-frame::after,
+.scan-frame > .br::before, .scan-frame > .br::after {
+  content: ""; position: absolute; width: 26px; height: 26px;
+  border: 2px solid var(--gold); z-index: 4;
+  animation: bracketPulse 1.8s var(--ease-out) infinite;
+}
+.scan-frame::before { top: 12px; inset-inline-start: 12px; border-inline-end: 0; border-bottom: 0; border-radius: 6px 0 0 0; }
+.scan-frame::after  { top: 12px; inset-inline-end: 12px;  border-inline-start: 0; border-bottom: 0; border-radius: 0 6px 0 0; }
+.scan-frame > .br::before { bottom: 12px; inset-inline-start: 12px; border-inline-end: 0; border-top: 0; border-radius: 0 0 0 6px; }
+.scan-frame > .br::after  { bottom: 12px; inset-inline-end: 12px;  border-inline-start: 0; border-top: 0; border-radius: 0 0 6px 0; }
+@keyframes bracketPulse { 0%,100% { opacity: .45 } 50% { opacity: 1 } }
+
+/* ---------- Micro interactions ---------- */
+@keyframes tabPop {
+  from { transform: scaleX(0); opacity: 0; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+@keyframes ringOut {
+  0%   { transform: scale(1);    opacity: .8 }
+  100% { transform: scale(1.55); opacity: 0 }
+}
+@keyframes pop {
+  0%   { transform: scale(.82); opacity: 0 }
+  60%  { transform: scale(1.05); opacity: 1 }
+  100% { transform: scale(1) }
+}
+.pop { animation: pop var(--d-mid) var(--ease-soft) both; }
+
+@keyframes floatY {
+  0%,100% { transform: translateY(0) }
+  50%     { transform: translateY(-7px) }
+}
+.float { animation: floatY 5s var(--ease-out) infinite; }
+
+@keyframes breathe {
+  0%,100% { transform: scale(1);    opacity: .9 }
+  50%     { transform: scale(1.04); opacity: 1 }
+}
+
+/* ---------- Sparkle burst (outfit generated) ---------- */
+.sparkle {
+  position: fixed; z-index: 900; pointer-events: none;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--gold);
+  animation: sparkFly var(--d-lux) var(--ease-out) forwards;
+}
+@keyframes sparkFly {
+  0%   { transform: translate(0,0) scale(0); opacity: 1 }
+  35%  { opacity: 1 }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1.1); opacity: 0 }
+}
+
+/* ---------- Look card entrance ---------- */
+@keyframes lookReveal {
+  0%   { opacity: 0; transform: perspective(1200px) rotateX(9deg) translateY(40px); }
+  100% { opacity: 1; transform: perspective(1200px) rotateX(0) translateY(0); }
+}
+.look-card { animation: lookReveal var(--d-lux) var(--ease-lux) both; }
+
+/* ---------- Hanger swing (loading state) ---------- */
+@keyframes swing {
+  0%,100% { transform: rotate(-7deg) }
+  50%     { transform: rotate(7deg) }
+}
+.hanger { transform-origin: 50% 8%; animation: swing 2s var(--ease-out) infinite; }
+
+/* ---------- Progress bar ---------- */
+@keyframes barSlide {
+  from { transform: translateX(-100%) }
+  to   { transform: translateX(400%) }
+}
+
+/* ---------- Toast ---------- */
+@keyframes toastIn {
+  from { opacity: 0; transform: translate3d(0, 26px, 0) scale(.94) }
+  to   { opacity: 1; transform: none }
+}
+@keyframes toastOut {
+  to { opacity: 0; transform: translate3d(0, 16px, 0) scale(.96) }
+}
+
+/* ---------- Sheet ---------- */
+@keyframes sheetIn  { from { transform: translateY(100%) } to { transform: none } }
+@keyframes sheetOut { to   { transform: translateY(100%) } }
+@keyframes scrimIn  { from { opacity: 0 } to { opacity: 1 } }
+
+/* ---------- Splash ---------- */
+@keyframes splashOut {
+  0%   { opacity: 1; transform: scale(1) }
+  100% { opacity: 0; transform: scale(1.08); visibility: hidden }
+}
+@keyframes drawLine { from { width: 0 } to { width: 88px } }
+
+/* ---------- Color swatch bloom ---------- */
+@keyframes swatchIn {
+  from { transform: scale(0) rotate(-40deg); opacity: 0 }
+  to   { transform: none; opacity: 1 }
+}
+.swatch { animation: swatchIn var(--d-mid) var(--ease-soft) both; }
+.swatch:nth-child(2){animation-delay:.06s} .swatch:nth-child(3){animation-delay:.12s}
+.swatch:nth-child(4){animation-delay:.18s} .swatch:nth-child(5){animation-delay:.24s}
+
+/* ---------- Marquee (trend ticker) ---------- */
+@keyframes marquee {
+  from { transform: translateX(0) }
+  to   { transform: translateX(-50%) }
+}
+.marquee-track {
+  display: flex; gap: var(--s6); width: max-content;
+  animation: marquee 26s linear infinite;
+}
+[dir="rtl"] .marquee-track { animation-direction: reverse; }
+.marquee:hover .marquee-track { animation-play-state: paused; }
