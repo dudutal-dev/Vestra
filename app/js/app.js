@@ -2,7 +2,7 @@
    VESTRA · Application shell & router
    ============================================================ */
 
-import { $, $$, el, icon, toast, buzz, openSheet } from './ui.js';
+import { $, $$, el, icon, toast, buzz, openSheet, closeAllSheets } from './ui.js';
 import { t, setLang, lang, applyStaticText, isHe } from './i18n.js';
 import { state, refreshAll, itemById } from './state.js';
 import { Settings } from './store.js';
@@ -122,6 +122,7 @@ function bindScroll() {
 
 /* ---------------- Boot ---------------- */
 async function boot() {
+  closeAllSheets();
   setLang(lang());
   paintChrome();
   bindScroll();

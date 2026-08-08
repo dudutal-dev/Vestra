@@ -3,11 +3,13 @@
    ============================================================ */
 
 import { el, icon, esc, toast, sparkle, buzz, observeReveal } from '../ui.js';
-import { t, isHe } from '../i18n.js';
+import { t, isHe, pick } from '../i18n.js';
 import { state, refreshLooks, itemById } from '../state.js';
 import { Looks, newId, hasKey } from '../store.js';
 import { buildLook, pairWithItem, errText } from '../ai.js';
 import { buildLookLocal, pairWithItemLocal } from '../stylist.js';
+import { renderTryOn, renderLookbook, downloadCanvas } from '../tryon.js';
+import { loadImage } from '../makeup.js';
 import { OCCASIONS, TIMES, WEATHER, MOODS, occName, catIcon, lbl } from '../taxonomy.js';
 import { renderLookCard } from './lookcard.js';
 
@@ -157,7 +159,113 @@ function renderSingleResult(root, ctx) {
         onSave: (l, e) => saveLook(l, e, ctx),
         onBeauty: (l) => { ctx.go('beauty', { look: l }); },
       }),
+      tryOnBlock(look, ctx),
     ),
+  );
+}
+
+/* ============================================================
+   Try-on — places the outfit over the owner's own body photo
+   ============================================================ */
+export function tryOnBlock(look, ctx) {
+  const rec = state.body;
+  const items = (look?.items || []).map(r => itemById(r.id)).filter(Boolean);
+
+  if (!rec?.photo || !rec.regions) {
+    return el('div', { class: 'card center stack g3' },
+      el('div', { html: icon('hanger'), style: { width: '40px', margin: '0 auto', color: 'var(--ink-4)' } }),
+      el('div', { class: 'tiny muted', text: t('tryon_need_body') }),
+      el('button', {
+        class: 'btn btn-primary btn-sm', style: { margin: '0 auto' },
+        html: icon('camera') + `<span>${esc(t('tryon_open_capture'))}</span>`,
+        onclick: () => ctx.go('capture', { mode: 'body' }),
+      }),
+    );
+  }
+
+  const before = el('img', { src: rec.photo, alt: '' });
+  const canvas = el('canvas', { 'aria-label': t('tryon_title') });
+  const stage = el('div', { class: 'sim-stage' },
+    before,
+    canvas,
+    el('span', { class: 'sim-tag sim-tag-a', text: t('tryon_title') }),
+    el('span', { class: 'sim-divider' }),
+    el('input', {
+      class: 'sim-range', type: 'range', min: '0', max: '100', value: '62',
+      'aria-label': t('tryon_title'),
+      oninput: (e) => stage.style.setProperty('--split', e.target.value + '%'),
+    }),
+  );
+
+  let opacity = 0.85;
+  let photoEl = null;
+
+  async function draw() {
+    photoEl ||= await loadImage(rec.photo);
+    await renderTryOn(canvas, photoEl, rec.regions, items, { opacity });
+  }
+  draw().catch(() => toast(t('err_generic'), 'warn'));
+
+  const fit = rec.body;
+  const fitCard = fit ? el('section', { class: 'card' },
+    el('div', { class: 'eyebrow', style: { marginBottom: 'var(--s3)' }, text: t('fit_notes') }),
+    el('dl', { style: { margin: 0 } },
+      fit.shape ? el('div', { class: 'kv' }, el('dt', { text: t('p_body_shape') }), el('dd', { text: fit.shape })) : null,
+      fit.ratio ? el('div', { class: 'kv' }, el('dt', { text: t('f_ratio') }), el('dd', { text: fit.ratio })) : null,
+    ),
+    pick(fit, 'proportions') ? el('div', { class: 'tiny muted', style: { marginTop: 'var(--s3)' }, text: pick(fit, 'proportions') }) : null,
+    pick(fit, 'focus') ? el('div', { class: 'alert alert-ok', style: { marginTop: 'var(--s3)' } },
+      el('span', { html: icon('sparkles') }),
+      el('div', { text: pick(fit, 'focus') })) : null,
+    (fit.fit_notes || []).length ? el('div', { class: 'stack g2', style: { marginTop: 'var(--s4)' } },
+      fit.fit_notes.map(n => el('div', { class: 'gap-row' },
+        el('div', { class: 'grow' },
+          el('b', { class: 'micro', style: { textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--ink-3)' }, text: n.area }),
+          el('div', { class: 'tiny', text: pick(n, 'advice') }),
+        ),
+      ))) : null,
+  ) : null;
+
+  return el('div', { class: 'stack g3' },
+    el('div', { class: 'row between g2' },
+      el('span', { class: 'eyebrow', text: t('tryon_title') }),
+      el('button', {
+        class: 'btn btn-quiet btn-sm tiny',
+        html: icon('download') + `<span>${esc(t('tryon_lookbook'))}</span>`,
+        onclick: async (e) => {
+          e.currentTarget.disabled = true;
+          try {
+            const sheet = await renderLookbook({
+              bodyPhoto: photoEl,
+              items,
+              palette: look.palette || [],
+              title: pick(look, 'title') || t('look_ready'),
+              subtitle: pick(look, 'occasion') || '',
+              note: pick(look, 'why_it_works') || '',
+              rtl: isHe(),
+            });
+            downloadCanvas(sheet, `vestra-lookbook-${Date.now()}.png`);
+            toast(t('tryon_saved'));
+            buzz(14);
+          } catch {
+            toast(t('err_generic'), 'warn');
+          } finally {
+            e.currentTarget.disabled = false;
+          }
+        },
+      }),
+    ),
+    stage,
+    el('div', {},
+      el('div', { class: 'label', text: t('tryon_opacity') }),
+      el('input', {
+        class: 'slider', type: 'range', min: '30', max: '100', value: '85',
+        'aria-label': t('tryon_opacity'),
+        oninput: (e) => { opacity = +e.target.value / 100; draw(); },
+      }),
+    ),
+    el('p', { class: 'micro muted', style: { margin: 0 }, text: t('tryon_disclaimer') }),
+    fitCard,
   );
 }
 
@@ -185,10 +293,13 @@ function renderPairResult(root, ctx) {
 
   const paint = () => {
     const look = (res.outfits || [])[idx] || (res.outfits || [])[0];
-    host.replaceChildren(renderLookCard(look, {
-      onSave: (l, e) => saveLook(l, e, ctx),
-      onBeauty: (l) => ctx.go('beauty', { look: l }),
-    }));
+    host.replaceChildren(
+      renderLookCard(look, {
+        onSave: (l, e) => saveLook(l, e, ctx),
+        onBeauty: (l) => ctx.go('beauty', { look: l }),
+      }),
+      el('div', { style: { marginTop: 'var(--s5)' } }, tryOnBlock(look, ctx)),
+    );
   };
 
   root.replaceChildren(

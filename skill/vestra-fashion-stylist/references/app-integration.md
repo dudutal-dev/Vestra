@@ -183,6 +183,63 @@ Recommend the CCLS method: Category → Color (light to dark) → Length → Sea
 
 ---
 
+## 4b. PROMPT · מיפוי פנים (מפעיל את הדמיית האיפור)
+
+**System (תמצית):**
+```
+You receive a front-facing photo of the app owner's own face, uploaded by them to
+preview makeup. Analyze for styling only — never identify the person.
+
+Return ONLY valid JSON with TWO parts:
+
+(1) "face": {shape, skin_undertone, skin_depth, contrast, eye_shape, lip_fullness,
+             brow_shape, notes_he/en, apply_he/en, confidence}
+    "notes" = what the features are. "apply" = the single adjustment that matters
+    most for THIS face (hooded lids -> shadow above the crease, and so on).
+
+(2) "regions": every landmark as an ELLIPSE in coordinates NORMALIZED to the
+    image — cx/rx are fractions of WIDTH, cy/ry fractions of HEIGHT, rot in
+    degrees. Required keys:
+      lips, lip_upper, lip_lower, eye_left/right, lid_left/right,
+      brow_left/right, cheek_left/right, bone_left/right, jaw_left/right,
+      nose, forehead, chin, face
+    LEFT means the left of the IMAGE, not the person's own left.
+    "cheek" = the apple (blush). "bone" = the cheekbone top (highlighter).
+    "jaw"  = the hollow under the bone (contour). "face" = hairline to chin.
+```
+
+**איך האפליקציה משתמשת בזה:** כל צעד איפור נצבע על האזור שלו בקנבס, עם גרדיאנט
+רדיאלי שדוהה לשקיפות מלאה בשוליים — הקצה הרך של איפור אמיתי. מצב המיזוג נבחר לפי
+גוון העור שנדגם **מתחת** לאזור: פיגמנט כהה מהעור → `multiply`, פיגמנט בהיר מהעור →
+`screen`. בלי זה, סומק נעלם על עור בהיר או מתבוסס על עור כהה.
+
+---
+
+## 4c. PROMPT · מיפוי גוף (מפעיל התאמת גזרות ותצוגת לוק)
+
+**System (תמצית):**
+```
+You receive a full-length photo of the app owner. Assess proportions the way a
+tailor would. Never identify the person; never comment on weight, attractiveness
+or health — proportion and balance only, in neutral constructive language.
+
+Return ONLY valid JSON with TWO parts:
+
+(1) "body": {shape, ratio, proportions_he/en, focus_he/en,
+             fit_notes:[{area, advice_he, advice_en}], confidence}
+    Guiding principle: never "hide" — BALANCE.
+
+(2) "regions": boxes NORMALIZED to the image {x,y,w,h}, origin top-left:
+      head, torso, waist, hips, legs, feet, full
+    "torso" = shoulders to waist. "legs" = waist to ankle. "feet" = the shoes.
+```
+
+**מיפוי קטגוריה → אזור בתצוגה:** עליונית→torso · שמלה→torso+legs · תחתונית→legs ·
+שכבה חיצונית→torso מורחב · נעליים→feet · תיק→לצד ה-hips · כובע→head.
+חגורות ותכשיטים לא מצוירים — קטנים מכדי להיקרא בגודל הזה.
+
+---
+
 ## 5. PROMPT · המלצת איפור / grooming
 
 **System:**

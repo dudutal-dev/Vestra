@@ -3,7 +3,7 @@
    App shell is cached for offline use. API calls are never cached.
    ============================================================ */
 
-const VERSION = 'vestra-v1';
+const VERSION = 'vestra-v2';
 const SHELL = [
   './',
   './index.html',
@@ -20,6 +20,8 @@ const SHELL = [
   './js/ui.js',
   './js/ai.js',
   './js/stylist.js',
+  './js/makeup.js',
+  './js/tryon.js',
   './js/views/home.js',
   './js/views/wardrobe.js',
   './js/views/capture.js',

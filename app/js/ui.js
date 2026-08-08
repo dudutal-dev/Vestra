@@ -84,14 +84,27 @@ export function openSheet(contentNode, { onClose } = {}) {
   const sheet = el('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true' },
     el('div', { class: 'sheet-grip' }), contentNode);
 
+  let closing = false;
   const close = () => {
+    if (closing) return;
+    closing = true;
     sheet.classList.add('is-closing');
     scrim.style.animation = 'scrimIn 180ms reverse both';
-    sheet.addEventListener('animationend', () => {
+
+    // animationend is unreliable here — the element already carries a filled
+    // opening animation, and an interrupted one may never emit the event. Drive
+    // the teardown on a timer and treat the event as an early finish.
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
       sheet.remove(); scrim.remove();
       sheetStack = sheetStack.filter(s => s.close !== close);
       onClose?.();
-    }, { once: true });
+    };
+    const timer = setTimeout(finish, 240);
+    sheet.addEventListener('animationend', finish, { once: true });
   };
 
   scrim.addEventListener('click', close);
@@ -120,6 +133,16 @@ export function openSheet(contentNode, { onClose } = {}) {
 }
 
 export const closeTopSheet = () => sheetStack.at(-1)?.close();
+
+/**
+ * Tear every sheet down immediately, no exit animation.
+ * Called on language change and reboot — an open sheet would otherwise survive
+ * the re-render and sit there in the previous language.
+ */
+export function closeAllSheets() {
+  sheetStack = [];
+  $$('.sheet, .scrim').forEach(n => n.remove());
+}
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTopSheet(); });
 
@@ -172,6 +195,13 @@ export function sparkle(x, y, n = 16) {
 export function splitText(node, text) {
   node.innerHTML = '';
   node.classList.add('split-in');
+
+  // Each letter becomes its own inline-block so it can animate independently.
+  // That also means the browser orders the spans by the container's direction
+  // rather than by the text's own script — Latin text inside an RTL page comes
+  // out reversed. Pin the direction to whatever the content actually is.
+  node.style.direction = /[֐-׿؀-ۿ]/.test(text) ? 'rtl' : 'ltr';
+
   [...text].forEach((ch, i) => {
     node.append(el('span', {
       text: ch === ' ' ? ' ' : ch,

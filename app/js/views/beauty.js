@@ -7,6 +7,8 @@ import { t, pick, isHe } from '../i18n.js';
 import { state } from '../state.js';
 import { hasKey } from '../store.js';
 import { beautyLook, errText } from '../ai.js';
+import { renderMakeup, loadImage } from '../makeup.js';
+import { downloadCanvas } from '../tryon.js';
 import { BEAUTY_LOOKS, OCCASION_BEAUTY, OCCASIONS, occName, lbl } from '../taxonomy.js';
 
 /* Offline reference looks — SKILL.md Module 7.2 / 7.3 */
@@ -164,6 +166,8 @@ export function renderBeauty(root, ctx) {
       time_of_day: state.request.time,
       palette: fromLook?.palette || null,
       look_key: key,
+      // When the owner has mapped their own face, every step gets tailored to it.
+      face: state.face?.face || null,
     };
 
     try {
@@ -181,7 +185,9 @@ export function renderBeauty(root, ctx) {
   }
 
   function paint(d) {
-    host.replaceChildren(
+    host.replaceChildren(...[
+      simulationBlock(d, ctx),
+      faceCard(),
       el('article', { class: 'look-card' },
         el('div', { class: 'look-head' },
           el('div', { class: 'eyebrow', text: '✦ ' + (isHe() ? 'הלוק שנבחר' : 'Selected look') }),
@@ -209,9 +215,111 @@ export function renderBeauty(root, ctx) {
           el('span', { class: 'note-label', text: t('bt_tip') }),
           el('div', { class: 'tiny', text: pick(d, 'longevity_tip') })) : null,
       ),
-    );
+    ].filter(Boolean));
     observeReveal(host);
   }
+}
+
+/* ============================================================
+   The simulation — paints the look onto the owner's own photo
+   ============================================================ */
+function simulationBlock(look, ctx) {
+  const rec = state.face;
+
+  if (!rec?.photo || !rec.regions) {
+    return el('div', { class: 'card center stack g3' },
+      el('div', { html: icon('user'), style: { width: '40px', margin: '0 auto', color: 'var(--ink-4)' } }),
+      el('div', { class: 'tiny muted', text: t('sim_need_face') }),
+      el('button', {
+        class: 'btn btn-primary btn-sm', style: { margin: '0 auto' },
+        html: icon('camera') + `<span>${esc(t('sim_open_capture'))}</span>`,
+        onclick: () => ctx.go('capture', { mode: 'face' }),
+      }),
+    );
+  }
+
+  const before = el('img', { src: rec.photo, alt: t('sim_before') });
+  const canvas = el('canvas', { 'aria-label': t('sim_after') });
+  const stage = el('div', { class: 'sim-stage' },
+    before,
+    canvas,
+    el('span', { class: 'sim-tag sim-tag-a', text: t('sim_after') }),
+    el('span', { class: 'sim-tag sim-tag-b', text: t('sim_before') }),
+    el('span', { class: 'sim-divider' }),
+    el('input', {
+      class: 'sim-range', type: 'range', min: '0', max: '100', value: '62',
+      'aria-label': `${t('sim_before')} / ${t('sim_after')}`,
+      oninput: (e) => stage.style.setProperty('--split', e.target.value + '%'),
+    }),
+  );
+
+  let intensity = 1;
+  const intensityRange = el('input', {
+    class: 'slider', type: 'range', min: '0', max: '150', value: '100',
+    'aria-label': t('sim_intensity'),
+    oninput: (e) => { intensity = +e.target.value / 100; draw(); },
+  });
+
+  let photoEl = null;
+  async function draw() {
+    try {
+      photoEl ||= await loadImage(rec.photo);
+      const n = renderMakeup(canvas, photoEl, rec.regions, look.steps || [], { intensity });
+      if (!n) canvas.getContext('2d').drawImage(photoEl, 0, 0, canvas.width, canvas.height);
+    } catch {
+      toast(t('err_generic'), 'warn');
+    }
+  }
+  draw();
+
+  return el('div', { class: 'stack g3' },
+    el('div', { class: 'row between g2' },
+      el('span', { class: 'eyebrow', text: t('sim_title') }),
+      el('button', {
+        class: 'btn btn-quiet btn-sm tiny', html: icon('download'),
+        'aria-label': t('p_export'),
+        onclick: () => {
+          downloadCanvas(canvas, `vestra-makeup-${Date.now()}.png`);
+          buzz(12);
+        },
+      }),
+    ),
+    stage,
+    el('div', {},
+      el('div', { class: 'label', text: t('sim_intensity') }),
+      intensityRange,
+    ),
+    el('p', { class: 'micro muted', style: { margin: 0 }, text: t('sim_disclaimer') }),
+  );
+}
+
+/* The face analysis itself, once it exists. */
+function faceCard() {
+  const f = state.face?.face;
+  if (!f) return null;
+
+  const row = (label, value) => value
+    ? el('div', { class: 'kv' }, el('dt', { text: label }), el('dd', { text: value }))
+    : null;
+
+  return el('section', { class: 'card' },
+    el('div', { class: 'eyebrow', style: { marginBottom: 'var(--s3)' }, text: t('face_analysis') }),
+    el('dl', { style: { margin: 0 } },
+      row(t('f_face_shape'), f.shape),
+      row(t('p_undertone'), f.skin_undertone),
+      row(t('p_depth'), f.skin_depth),
+      row(t('f_contrast'), f.contrast),
+      row(t('f_eye_shape'), f.eye_shape),
+      row(t('f_lip'), f.lip_fullness),
+    ),
+    pick(f, 'apply') ? el('div', { class: 'alert alert-ok', style: { marginTop: 'var(--s4)' } },
+      el('span', { html: icon('sparkles') }),
+      el('div', { class: 'grow' },
+        el('b', { text: t('f_apply') }),
+        el('div', { style: { marginTop: '3px' }, text: pick(f, 'apply') }),
+      ),
+    ) : null,
+  );
 }
 
 /* ---------------- Local reference look ---------------- */

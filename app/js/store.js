@@ -5,7 +5,7 @@
    ============================================================ */
 
 const DB_NAME = 'vestra';
-const DB_VER  = 1;
+const DB_VER  = 2;
 let _db = null;
 
 function open() {
@@ -25,6 +25,11 @@ function open() {
       }
       if (!db.objectStoreNames.contains('closets')) {
         db.createObjectStore('closets', { keyPath: 'id' });
+      }
+      // v2 — the owner's own face / body photos plus their analyses.
+      // Keyed by a fixed slot ('face' | 'body') so there is exactly one of each.
+      if (!db.objectStoreNames.contains('media')) {
+        db.createObjectStore('media', { keyPath: 'slot' });
       }
     };
     req.onsuccess = () => { _db = req.result; resolve(_db); };
@@ -69,6 +74,15 @@ export const Closets = {
   clear: ()   => tx('closets', 'readwrite', s => s.clear()),
 };
 
+/* ---------------- The owner's face / body photos ---------------- */
+export const Media = {
+  get:    (slot) => tx('media', 'readonly',  s => s.get(slot)),
+  all:    ()     => tx('media', 'readonly',  s => s.getAll()),
+  put:    (rec)  => tx('media', 'readwrite', s => s.put(rec)),
+  remove: (slot) => tx('media', 'readwrite', s => s.delete(slot)),
+  clear:  ()     => tx('media', 'readwrite', s => s.clear()),
+};
+
 /* ---------------- Profile ---------------- */
 const PROFILE_KEY = 'vestra.profile';
 export const DEFAULT_PROFILE = {
@@ -111,6 +125,8 @@ export const Settings = {
   set theme(v)  { localStorage.setItem('vestra.theme', v); document.documentElement.dataset.theme = v; },
   get seen()    { return localStorage.getItem('vestra.seen') === '1'; },
   set seen(v)   { localStorage.setItem('vestra.seen', v ? '1' : '0'); },
+  get lastBackup()  { return localStorage.getItem('vestra.lastBackup') || ''; },
+  set lastBackup(v) { localStorage.setItem('vestra.lastBackup', String(v)); },
 };
 
 export const hasKey = () => Settings.apiKey.trim().length > 10;
@@ -121,14 +137,20 @@ export const newId = (p = 'itm') =>
   `${p}_${Date.now().toString(36)}${(_seq++).toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 
 /* ---------------- Export / import ---------------- */
-export async function exportAll() {
+/**
+ * Face and body photos are deliberately left out of the export by default —
+ * a wardrobe backup shouldn't quietly carry pictures of the owner around.
+ */
+export async function exportAll({ includePhotos = false } = {}) {
   const [items, looks, closets] = await Promise.all([Items.all(), Looks.all(), Closets.all()]);
-  return {
-    app: 'VESTRA', version: 1,
+  const out = {
+    app: 'VESTRA', version: 2,
     exportedAt: new Date().toISOString(),
     profile: getProfile(),
     items, looks, closets,
   };
+  if (includePhotos) out.media = await Media.all();
+  return out;
 }
 
 export async function importAll(data) {
@@ -136,12 +158,13 @@ export async function importAll(data) {
   if (Array.isArray(data.items) && data.items.length) await Items.putMany(data.items);
   if (Array.isArray(data.looks)) for (const l of data.looks) await Looks.put(l);
   if (Array.isArray(data.closets)) for (const c of data.closets) await Closets.put(c);
+  if (Array.isArray(data.media)) for (const m of data.media) await Media.put(m);
   if (data.profile) setProfile({ ...DEFAULT_PROFILE, ...data.profile });
   return (data.items || []).length;
 }
 
 export async function wipeAll() {
-  await Promise.all([Items.clear(), Looks.clear(), Closets.clear()]);
+  await Promise.all([Items.clear(), Looks.clear(), Closets.clear(), Media.clear()]);
   localStorage.removeItem(PROFILE_KEY);
 }
 

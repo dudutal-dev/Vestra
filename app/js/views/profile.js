@@ -2,11 +2,11 @@
    VESTRA · Profile & settings
    ============================================================ */
 
-import { el, icon, esc, toast, confirmSheet, observeReveal, $ } from '../ui.js';
+import { el, icon, esc, toast, confirmSheet, openSheet, observeReveal, $ } from '../ui.js';
 import { t, isHe, setLang, lang } from '../i18n.js';
-import { state, refreshAll } from '../state.js';
+import { state, refreshAll, refreshMedia } from '../state.js';
 import {
-  getProfile, setProfile, Settings, exportAll, importAll, wipeAll, closetScore,
+  getProfile, setProfile, Settings, Media, exportAll, importAll, wipeAll, closetScore,
 } from '../store.js';
 import { BODY_SHAPES, COLOR_SEASONS, ARCHETYPES, lbl } from '../taxonomy.js';
 
@@ -113,6 +113,28 @@ export function renderProfile(root, ctx) {
         })),
       ),
 
+      /* ---------- Guide ---------- */
+      el('button', {
+        class: 'card card-lift row between g3 on-scroll',
+        style: { width: '100%', textAlign: 'start', cursor: 'pointer' },
+        onclick: openGuide,
+      },
+        el('div', { class: 'grow' },
+          el('div', { class: 'eyebrow', text: t('p_guide') }),
+          el('div', { class: 'slot-name', style: { marginTop: '4px' }, text: t('guide_title') }),
+        ),
+        el('span', { html: icon('sparkles'), style: { width: '22px', color: 'var(--oxblood)' } }),
+      ),
+
+      /* ---------- My photos ---------- */
+      card(t('p_photos'),
+        el('div', { class: 'row g3' },
+          photoSlot('face', t('p_face_photo'), ctx),
+          photoSlot('body', t('p_body_photo'), ctx),
+        ),
+        el('p', { class: 'micro muted', style: { marginTop: 'var(--s4)', marginBottom: 0 }, text: t('photos_privacy') }),
+      ),
+
       /* ---------- App settings ---------- */
       card(t('p_app'),
         field(t('p_lang'), seg([['he', 'עברית'], ['en', 'English']], lang(), v => {
@@ -149,9 +171,19 @@ export function renderProfile(root, ctx) {
             .map(([v, label]) => el('option', { value: v, selected: Settings.model === v || null, text: label })),
         )),
 
-        el('div', { class: 'row g2 wrap', style: { marginTop: 'var(--s4)' } },
+        el('div', { class: 'alert alert-med', style: { marginTop: 'var(--s5)' } },
+          el('span', { html: icon('download') }),
+          el('div', { class: 'grow' },
+            el('div', { text: t('backup_reminder') }),
+            el('div', { class: 'micro muted', style: { marginTop: '5px' },
+              text: `${t('last_backup')}: ${Settings.lastBackup
+                ? new Date(+Settings.lastBackup).toLocaleDateString(isHe() ? 'he-IL' : 'en-GB')
+                : t('never')}` }),
+          ),
+        ),
+        el('div', { class: 'row g2 wrap', style: { marginTop: 'var(--s3)' } },
           el('button', {
-            class: 'btn btn-ghost btn-sm grow', html: icon('download') + `<span>${esc(t('p_export'))}</span>`,
+            class: 'btn btn-primary btn-sm grow', html: icon('download') + `<span>${esc(t('p_export'))}</span>`,
             onclick: doExport,
           }),
           el('button', {
@@ -181,15 +213,29 @@ export function renderProfile(root, ctx) {
 
   /* ---------- data actions ---------- */
   async function doExport() {
-    const data = await exportAll();
+    const hasPhotos = !!(state.face || state.body);
+    // Photos of the owner are opt-in: a wardrobe backup shouldn't quietly
+    // carry pictures of them into a file they might share or sync.
+    const includePhotos = hasPhotos
+      ? await confirmSheet({
+          title: t('p_export'),
+          body: t('export_photos_q'),
+          confirmLabel: t('export_with_photos'),
+          cancelLabel: t('export_wardrobe_only'),
+        })
+      : false;
+
+    const data = await exportAll({ includePhotos });
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = el('a', {
       href: URL.createObjectURL(blob),
-      download: `vestra-closet-${new Date().toISOString().slice(0, 10)}.json`,
+      download: `vestra-backup-${new Date().toISOString().slice(0, 10)}.json`,
     });
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    Settings.lastBackup = Date.now();
     toast(t('exported'));
+    ctx.rerender();
   }
 
   function doImport() {
@@ -244,6 +290,74 @@ function seg(pairs, current, onPick) {
     })),
   );
   return row;
+}
+
+/* ---------------- The in-app guide ---------------- */
+export function openGuide() {
+  const steps = t('guide_steps') || [];
+  const body = el('div', {},
+    el('div', { class: 'eyebrow', text: t('p_guide') }),
+    el('h3', { style: { marginBlock: '6px var(--s5)' }, text: t('guide_title') }),
+
+    el('div', {}, steps.map(([title, text]) => el('div', { class: 'step' },
+      el('div', { class: 'step-num', html: icon('check') }),
+      el('div', { class: 'grow' },
+        el('b', { class: 'slot-name', text: title }),
+        el('div', { class: 'tiny muted', style: { marginTop: '4px' }, text }),
+      ),
+    ))),
+
+    el('div', { class: 'alert alert-ok', style: { marginTop: 'var(--s3)' } },
+      el('span', { html: icon('sparkles') }),
+      el('div', { class: 'grow' },
+        el('b', { text: t('guide_tip_title') }),
+        el('div', { style: { marginTop: '4px' }, text: t('guide_tip') }),
+      ),
+    ),
+
+    el('button', {
+      class: 'btn btn-primary btn-block', style: { marginTop: 'var(--s5)' },
+      text: t('done'), onclick: () => close(),
+    }),
+  );
+  const close = openSheet(body);
+}
+
+function photoSlot(slot, label, ctx) {
+  const rec = state[slot];
+  const box = { width: '100%', aspectRatio: '3/4', borderRadius: 'var(--r-md)', objectFit: 'cover' };
+
+  return el('div', { class: 'grow stack g2' },
+    rec?.photo
+      ? el('div', { style: { position: 'relative' } },
+          el('img', { src: rec.photo, alt: label, style: box }),
+          el('button', {
+            class: 'icon-btn', html: icon('trash'), 'aria-label': t('remove_photo'),
+            style: { position: 'absolute', insetInlineEnd: '8px', top: '8px', width: '32px', height: '32px' },
+            onclick: async () => {
+              const ok = await confirmSheet({
+                title: t('remove_photo'), confirmLabel: t('remove_photo'),
+                cancelLabel: t('cancel'), danger: true,
+              });
+              if (!ok) return;
+              await Media.remove(slot);
+              await refreshMedia();
+              toast(t('photo_removed'));
+              ctx.rerender();
+            },
+          }),
+        )
+      : el('button', {
+          class: 'card card-flat center',
+          style: { ...box, display: 'grid', placeItems: 'center', border: '2px dashed var(--line)' },
+          onclick: () => ctx.go('capture', { mode: slot }),
+        },
+          el('div', { html: icon(slot === 'face' ? 'user' : 'hanger'), style: { width: '28px', margin: '0 auto', color: 'var(--ink-4)' } }),
+        ),
+    el('div', { class: 'micro muted center', text: label }),
+    el('div', { class: 'micro center', style: { color: rec ? 'var(--ok)' : 'var(--ink-4)' },
+      text: rec ? '✓' : t('p_no_photo') }),
+  );
 }
 
 function themeSwitch() {

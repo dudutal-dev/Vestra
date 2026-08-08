@@ -2,7 +2,7 @@
    VESTRA · Shared app state + tiny event bus
    ============================================================ */
 
-import { Items, Looks, Closets, getProfile } from './store.js';
+import { Items, Looks, Closets, Media, getProfile } from './store.js';
 
 export const state = {
   view: 'home',
@@ -27,6 +27,10 @@ export const state = {
 
   // beauty
   beauty: null,
+
+  // the owner's own photos + their analyses
+  face: null,
+  body: null,
 };
 
 /* ---------------- Event bus ---------------- */
@@ -65,9 +69,16 @@ export async function refreshClosets() {
   return state.closets;
 }
 
+export async function refreshMedia() {
+  const [face, body] = await Promise.all([Media.get('face'), Media.get('body')]);
+  state.face = face || null;
+  state.body = body || null;
+  emit('media');
+}
+
 export async function refreshAll() {
   state.profile = getProfile();
-  await Promise.all([refreshItems(), refreshLooks(), refreshClosets()]);
+  await Promise.all([refreshItems(), refreshLooks(), refreshClosets(), refreshMedia()]);
 }
 
 export const itemById = (id) => state.items.find(i => i.id === id);

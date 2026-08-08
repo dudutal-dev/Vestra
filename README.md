@@ -42,8 +42,15 @@ Pick one piece and get **three** complete outfits around it — *dressed down*, 
 ### 🚪 Closet organization from a photo
 Shoot your closet standing open. You get zone mapping with occupancy percentages, diagnosed problems (rod over 70% = creasing and invisibility; folded stacks over 5 = the bottom never gets worn), a step-by-step plan with time estimates, and storage recommendations — all following the **CCLS** method: Category → Colour → Length → Season.
 
-### 💄 Beauty & grooming
-Five makeup looks plus a grooming track, matched to the occasion, your undertone and skin depth, and the outfit's palette. Current to F/W 26-27: oxblood lips, deliberate imperfection, smudged smokey, monochromatic face, double cat-eye, cosmic highlighter.
+### 💄 Beauty — simulated on your own face
+Upload one front-facing photo and Claude maps your features — face shape, undertone, skin depth, contrast, eye shape, lip fullness — plus the exact regions of your lips, lids, brows, cheeks, cheekbones and jaw.
+
+The app then **paints the look onto your photo**: a before/after wipe with an intensity slider, rendered on canvas with per-product blend modes. Blend mode is chosen from the skin tone actually sampled under each region, so blush reads correctly on fair and deep skin alike. Five makeup looks plus a grooming track, all current to F/W 26-27: oxblood lips, deliberate imperfection, smudged smokey, monochromatic face, double cat-eye, cosmic highlighter.
+
+### 🪞 See the look on you
+Upload a full-length photo and you get body shape, shoulder-to-hip ratio, proportions and concrete cut advice — plus the outfit **positioned over your own photo** with an opacity slider, and a **downloadable lookbook** card (1080×1350) with the pieces, palette and styling note.
+
+> This is a styling illustration, not a photorealistic render — the pieces are placed and feathered onto detected body regions, not warped onto your body.
 
 ### 📊 Wardrobe health
 Distribution by category, formality, colour and season · single-colour dominance warnings · near-duplicate detection · your workhorse pieces · and the three purchases that would unlock the most new outfits.
@@ -56,6 +63,11 @@ No key? The built-in **rules engine** still builds looks, pairs items, and runs 
 
 ---
 
+### 📸 Batch cataloging
+Select ten garment photos at once and they catalog in sequence with a progress readout — the fastest way to get a wardrobe in.
+
+---
+
 ## Privacy
 
 **There is no VESTRA server.** The app is static files.
@@ -63,7 +75,18 @@ No key? The built-in **rules engine** still builds looks, pairs items, and runs 
 - Photos, wardrobe and looks live in **IndexedDB on your device**
 - Your profile and API key live in **localStorage on your device**
 - Your API key goes **directly to `api.anthropic.com`** and nowhere else
+- Your **face and body photos never leave the device** except at the moment you press *Analyze*, and are excluded from backups unless you explicitly opt in
 - Export your whole closet to JSON at any time; erase everything with one button
+
+The face and body prompts instruct the model to assess features for styling only — never to identify the person, and never to comment on weight, attractiveness or health.
+
+> ⚠️ **Back up.** Your data lives in one browser. Clearing history, private browsing, or switching devices wipes it. **Profile → Export closet** writes a JSON file; the app shows you when you last did it.
+
+---
+
+## 📖 User guide
+
+**[GUIDE.md](GUIDE.md)** — how to work efficiently with the app, in Hebrew and English: how to shoot so recognition is accurate, the batch-cataloging strategy, how to read a look, backup practice, and cost control. It's also built into the app under **Profile → How to use VESTRA**.
 
 ---
 
@@ -133,8 +156,11 @@ vestra/
 │       ├── taxonomy.js           # categories, occasions, formality, palettes
 │       ├── ai.js                 # Claude client + prompts + image compression
 │       ├── stylist.js            # offline rules engine
+│       ├── makeup.js             # canvas makeup renderer (adaptive blend modes)
+│       ├── tryon.js              # garment placement + lookbook export
 │       ├── ui.js                 # icons, toasts, sheets, sparkles
 │       └── views/                # home · wardrobe · capture · studio · closet · beauty · profile
+├── GUIDE.md                      # user guide — Hebrew + English
 ├── skill/vestra-fashion-stylist/
 │   ├── SKILL.md                  # the expert
 │   └── references/

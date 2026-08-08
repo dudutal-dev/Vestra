@@ -1,51 +1,70 @@
 /* ============================================================
-   VESTRA · Capture — item cataloging & closet analysis
+   VESTRA · Capture
+   Four modes: a garment, the open closet, your face, your body.
    ============================================================ */
 
 import { el, icon, esc, toast, openSheet, sparkle, buzz, $ } from '../ui.js';
-import { t, isHe } from '../i18n.js';
-import { state, refreshItems, refreshClosets } from '../state.js';
-import { Items, Closets, newId, hasKey } from '../store.js';
-import { compressImage, catalogItem, analyzeCloset, errText, AIError } from '../ai.js';
+import { t, isHe, pick } from '../i18n.js';
+import { state, refreshItems, refreshClosets, refreshMedia } from '../state.js';
+import { Items, Closets, Media, newId, hasKey, getProfile, setProfile } from '../store.js';
+import {
+  compressImage, catalogItem, analyzeCloset, analyzeFace, analyzeBody, errText, AIError,
+} from '../ai.js';
 import {
   CATEGORIES, SUBCATS, SUBCAT_NAMES, FITS, FIT_NAMES, PATTERNS, PATTERN_NAMES,
   FABRICS, FABRIC_NAMES, FORMALITY, SEASONS, catName, subName, lbl, hexFor,
 } from '../taxonomy.js';
 
+const MODES = [
+  { key: 'item',   tKey: 'mode_item' },
+  { key: 'closet', tKey: 'mode_closet' },
+  { key: 'face',   tKey: 'mode_face' },
+  { key: 'body',   tKey: 'mode_body' },
+];
+
+const COPY = {
+  item:   { sub: 'capture_sub',      hintT: 'shot_hint_t', hintS: 'shot_hint_s', cta: 'analyze',      busy: 'scanning' },
+  closet: { sub: 'closet_sub',       hintT: 'shot_hint_t', hintS: 'shot_hint_s', cta: 'analyze_closet', busy: 'scanning_closet' },
+  face:   { sub: 'capture_face_sub', hintT: 'shot_face_t', hintS: 'shot_face_s', cta: 'analyze_face', busy: 'scanning_face' },
+  body:   { sub: 'capture_body_sub', hintT: 'shot_body_t', hintS: 'shot_body_s', cta: 'analyze_body', busy: 'scanning_body' },
+};
+
 export function renderCapture(root, ctx) {
   if (ctx.opts?.mode) state.captureMode = ctx.opts.mode;
+  const mode = state.captureMode;
+  const copy = COPY[mode];
 
   const zone = el('div', { class: 'shot-zone scan-frame' },
     el('span', { class: 'br' }),
     el('div', { class: 'shot-hint' },
-      el('div', { html: icon('camera') }),
-      el('b', { class: 'slot-name', text: t('shot_hint_t') }),
-      el('div', { class: 'tiny muted', style: { marginTop: '6px' }, text: t('shot_hint_s') }),
+      el('div', { html: icon(mode === 'face' ? 'user' : mode === 'body' ? 'hanger' : 'camera') }),
+      el('b', { class: 'slot-name', text: t(copy.hintT) }),
+      el('div', { class: 'tiny muted', style: { marginTop: '6px' }, text: t(copy.hintS) }),
     ),
   );
 
   const modeSeg = el('div', { class: 'seg' },
-    ['item', 'closet'].map(m => el('button', {
-      class: `chip ${state.captureMode === m ? 'is-on' : ''}`,
-      onclick: () => { state.captureMode = m; ctx.rerender(); },
-      text: m === 'item' ? t('mode_item') : t('mode_closet'),
+    MODES.map(m => el('button', {
+      class: `chip ${mode === m.key ? 'is-on' : ''}`, text: t(m.tKey),
+      onclick: () => { state.captureMode = m.key; state.shot = null; ctx.rerender(); },
     })),
   );
 
   const actions = el('div', { class: 'row g2' },
     el('button', {
       class: 'btn btn-primary grow', html: icon('camera') + `<span>${esc(t('take_photo'))}</span>`,
-      onclick: () => pick('#cameraPicker'),
+      onclick: () => pick('#cameraPicker', false),
     }),
     el('button', {
-      class: 'btn btn-ghost grow', html: icon('image') + `<span>${esc(t('pick_photo'))}</span>`,
-      onclick: () => pick('#filePicker'),
+      class: 'btn btn-ghost grow',
+      html: icon('image') + `<span>${esc(mode === 'item' ? t('upload_many') : t('pick_photo'))}</span>`,
+      onclick: () => pick('#filePicker', mode === 'item'),
     }),
   );
 
   const analyzeBtn = el('button', {
     class: 'btn btn-lux btn-block hidden',
-    html: icon('sparkles') + `<span>${esc(state.captureMode === 'closet' ? t('analyze_closet') : t('analyze'))}</span>`,
+    html: icon('sparkles') + `<span>${esc(t(copy.cta))}</span>`,
     onclick: (e) => run(e),
   });
 
@@ -54,10 +73,19 @@ export function renderCapture(root, ctx) {
     onclick: () => { state.shot = null; ctx.rerender(); },
   });
 
-  const manualBtn = el('button', {
+  const manualBtn = mode === 'item' ? el('button', {
     class: 'btn btn-ghost btn-block', html: icon('plus') + `<span>${esc(t('manual_add'))}</span>`,
     onclick: () => openManualForm(ctx),
-  });
+  }) : null;
+
+  const privacyNote = (mode === 'face' || mode === 'body') ? el('div', { class: 'alert alert-ok' },
+    el('span', { html: icon('check') }),
+    el('div', { text: t('photos_privacy') }),
+  ) : null;
+
+  const existing = (mode === 'face' && state.face) || (mode === 'body' && state.body)
+    ? existingCard(mode === 'face' ? state.face : state.body, mode, ctx)
+    : null;
 
   const keyBanner = hasKey() ? null : el('div', { class: 'alert alert-med' },
     el('span', { html: icon('key') }),
@@ -74,16 +102,18 @@ export function renderCapture(root, ctx) {
   root.replaceChildren(
     el('div', { class: 'pad stack g5', style: { paddingTop: 'var(--s4)' } },
       el('div', {},
-        el('h1', { style: { fontSize: 'var(--t-2xl)' }, text: state.captureMode === 'closet' ? t('closet') : t('capture') }),
-        el('p', { class: 'tiny muted', style: { marginTop: '6px' },
-          text: state.captureMode === 'closet' ? t('closet_sub') : t('capture_sub') }),
+        el('h1', { style: { fontSize: 'var(--t-2xl)' },
+          text: mode === 'closet' ? t('closet') : mode === 'face' ? t('sim_title') : mode === 'body' ? t('tryon_title') : t('capture') }),
+        el('p', { class: 'tiny muted', style: { marginTop: '6px' }, text: t(copy.sub) }),
       ),
       modeSeg,
+      existing,
       zone,
       actions,
       analyzeBtn,
       retakeBtn,
-      state.captureMode === 'item' ? manualBtn : null,
+      manualBtn,
+      privacyNote,
       keyBanner,
     ),
   );
@@ -91,14 +121,18 @@ export function renderCapture(root, ctx) {
   if (state.shot) showShot(state.shot);
 
   /* ---------- file input ---------- */
-  function pick(sel) {
+  function pick(sel, multiple) {
     const input = $(sel);
     input.value = '';
+    input.multiple = !!multiple;
     input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
+      const files = [...(input.files || [])];
+      if (!files.length) return;
+
+      if (multiple && files.length > 1) { await runBatch(files); return; }
+
       try {
-        const img = await compressImage(file);
+        const img = await compressImage(files[0]);
         state.shot = img;
         showShot(img);
       } catch {
@@ -113,13 +147,53 @@ export function renderCapture(root, ctx) {
     zone.replaceChildren(el('span', { class: 'br' }), el('img', { src: img.dataUrl, alt: '' }));
     analyzeBtn.classList.toggle('hidden', !hasKey());
     retakeBtn.classList.remove('hidden');
-    if (!hasKey() && state.captureMode === 'item') {
+    if (!hasKey() && mode === 'item') {
       toast(t('offline_mode'), 'warn');
       openManualForm(ctx, img);
     }
   }
 
-  /* ---------- run AI ---------- */
+  /* ---------- batch upload ---------- */
+  async function runBatch(files) {
+    if (!hasKey()) { toast(t('no_key_s'), 'warn'); return; }
+
+    const status = el('div', { class: 'scan-status' },
+      el('span', { html: icon('sparkles'), style: { width: '18px' } }),
+      el('span', { class: 'grow', text: '' }),
+      el('span', { class: 'bar' }, el('i')),
+    );
+    zone.classList.add('has-img', 'scanning');
+    zone.append(status);
+    const label = status.children[1];
+
+    let saved = 0, failed = 0;
+    for (const [i, file] of files.entries()) {
+      label.textContent = `${t('batch_progress')} ${i + 1} ${t('of')} ${files.length}`;
+      try {
+        const img = await compressImage(file);
+        zone.replaceChildren(el('span', { class: 'br' }), el('img', { src: img.dataUrl, alt: '' }), status);
+        const results = await catalogItem(img);
+        for (const [idx, r] of results.entries()) {
+          await persistItem(r, idx === 0 ? img.dataUrl : null);
+          saved++;
+        }
+      } catch {
+        failed++;
+      }
+    }
+
+    zone.classList.remove('scanning');
+    status.remove();
+    await refreshItems();
+    buzz(20);
+    toast(failed
+      ? `${saved} ${t('saved_items')} · ${failed} ✕`
+      : `${saved} ${t('saved_items')}`, failed ? 'warn' : '');
+    state.shot = null;
+    ctx.go('wardrobe');
+  }
+
+  /* ---------- single analysis ---------- */
   async function run(evt) {
     if (!state.shot) return;
     const steps = t('scan_steps');
@@ -128,40 +202,64 @@ export function renderCapture(root, ctx) {
     zone.classList.add('scanning');
     const status = el('div', { class: 'scan-status' },
       el('span', { html: icon('sparkles'), style: { width: '18px' } }),
-      el('span', { class: 'grow', text: state.captureMode === 'closet' ? t('scanning_closet') : steps[0] }),
+      el('span', { class: 'grow', text: mode === 'item' ? steps[0] : t(copy.busy) }),
       el('span', { class: 'bar' }, el('i')),
     );
     zone.append(status);
     const label = status.children[1];
     const tick = setInterval(() => {
       step = (step + 1) % steps.length;
-      label.textContent = state.captureMode === 'closet' ? t('scanning_closet') : steps[step];
+      label.textContent = mode === 'item' ? steps[step] : t(copy.busy);
     }, 1700);
 
     analyzeBtn.disabled = true;
     retakeBtn.disabled = true;
 
     try {
-      if (state.captureMode === 'closet') {
-        const res = await analyzeCloset(state.shot);
-        const record = { id: newId('cls'), createdAt: Date.now(), thumb: state.shot.dataUrl, ...res };
-        await Closets.put(record);
+      const shot = state.shot;
+
+      if (mode === 'closet') {
+        const res = await analyzeCloset(shot);
+        await Closets.put({ id: newId('cls'), createdAt: Date.now(), thumb: shot.dataUrl, ...res });
         await refreshClosets();
-        buzz(18);
-        const r = evt.currentTarget.getBoundingClientRect();
-        sparkle(r.left + r.width / 2, r.top);
+        celebrate(evt);
         state.shot = null;
         ctx.go('closet');
+
+      } else if (mode === 'face') {
+        const res = await analyzeFace(shot);
+        await Media.put({
+          slot: 'face', createdAt: Date.now(), photo: shot.dataUrl,
+          w: shot.w, h: shot.h, face: res.face || null, regions: res.regions || null,
+        });
+        await refreshMedia();
+        syncProfileFromFace(res.face);
+        celebrate(evt);
+        toast(t('face_saved'));
+        state.shot = null;
+        ctx.go('beauty');
+
+      } else if (mode === 'body') {
+        const res = await analyzeBody(shot);
+        await Media.put({
+          slot: 'body', createdAt: Date.now(), photo: shot.dataUrl,
+          w: shot.w, h: shot.h, body: res.body || null, regions: res.regions || null,
+        });
+        await refreshMedia();
+        syncProfileFromBody(res.body);
+        celebrate(evt);
+        toast(t('body_saved'));
+        state.shot = null;
+        ctx.go('studio');
+
       } else {
-        const results = await catalogItem(state.shot);
+        const results = await catalogItem(shot);
         const saved = [];
         for (const [idx, r] of results.entries()) {
-          saved.push(await persistItem(r, idx === 0 ? state.shot.dataUrl : null));
+          saved.push(await persistItem(r, idx === 0 ? shot.dataUrl : null));
         }
         await refreshItems();
-        buzz(18);
-        const r = evt.currentTarget.getBoundingClientRect();
-        sparkle(r.left + r.width / 2, r.top);
+        celebrate(evt);
         toast(saved.length > 1 ? `${saved.length} ${t('saved_items')}` : t('saved_item'));
         state.shot = null;
         if (saved.length === 1) openReview(saved[0], ctx);
@@ -178,6 +276,52 @@ export function renderCapture(root, ctx) {
       retakeBtn.disabled = false;
     }
   }
+
+  function celebrate(evt) {
+    buzz(18);
+    const r = evt?.currentTarget?.getBoundingClientRect?.();
+    if (r) sparkle(r.left + r.width / 2, r.top);
+  }
+}
+
+/* ---------------- An already-analysed face/body ---------------- */
+function existingCard(rec, mode, ctx) {
+  const a = mode === 'face' ? rec.face : rec.body;
+  return el('div', { class: 'card row g3', style: { alignItems: 'center' } },
+    el('img', { src: rec.photo, alt: '',
+      style: { width: '62px', height: '78px', objectFit: 'cover', borderRadius: 'var(--r-sm)', border: '1px solid var(--line)' } }),
+    el('div', { class: 'grow' },
+      el('div', { class: 'eyebrow', text: mode === 'face' ? t('p_face_photo') : t('p_body_photo') }),
+      el('div', { class: 'slot-name', text: a?.shape || '—' }),
+      el('div', { class: 'micro muted', text: new Date(rec.createdAt).toLocaleDateString(isHe() ? 'he-IL' : 'en-GB') }),
+    ),
+    el('button', {
+      class: 'icon-btn', html: icon('trash'), 'aria-label': t('remove_photo'),
+      onclick: async () => {
+        await Media.remove(mode);
+        await refreshMedia();
+        toast(t('photo_removed'));
+        ctx.rerender();
+      },
+    }),
+  );
+}
+
+/* Fold what the analysis learned back into the styling profile, so every
+   later recommendation benefits — but never overwrite a deliberate choice. */
+function syncProfileFromFace(face) {
+  if (!face) return;
+  const p = getProfile();
+  let touched = false;
+  if (face.skin_undertone && p.skin_undertone === 'neutral') { p.skin_undertone = face.skin_undertone; touched = true; }
+  if (face.skin_depth && p.skin_depth === 'medium') { p.skin_depth = face.skin_depth; touched = true; }
+  if (touched) { setProfile(p); state.profile = p; }
+}
+
+function syncProfileFromBody(body) {
+  if (!body?.shape) return;
+  const p = getProfile();
+  if (!p.body_shape) { p.body_shape = body.shape; setProfile(p); state.profile = p; }
 }
 
 /* ---------------- Persist an AI result ---------------- */

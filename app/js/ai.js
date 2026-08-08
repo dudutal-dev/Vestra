@@ -330,12 +330,142 @@ export async function analyzeCloset(img) {
 }
 
 /* ============================================================
+   4b · Face mapping — powers the makeup simulation
+   ============================================================ */
+const SYS_FACE = `You receive a front-facing photo of the app owner's own face. They uploaded it
+themselves to preview makeup on their features. Analyze the face for styling purposes only:
+never attempt to identify who the person is, guess their name, or infer anything beyond
+what a makeup artist would assess in the chair.
+
+Return ONLY valid JSON, no fences.
+
+You must return TWO things.
+
+(1) "face" — the assessment:
+{
+  "shape": "oval|round|square|heart|long|diamond|triangle",
+  "skin_undertone": "warm|cool|neutral|olive",
+  "skin_depth": "fair|light|medium|tan|deep",
+  "contrast": "low|medium|high",
+  "eye_shape": "almond|round|hooded|monolid|downturned|upturned|deep-set|wide-set|close-set",
+  "lip_fullness": "thin|medium|full",
+  "brow_shape": "straight|arched|rounded|angled|sparse|full",
+  "notes_he": "", "notes_en": "",
+  "apply_he": "", "apply_en": "",
+  "confidence": 0.0
+}
+"notes" = what the features are. "apply" = the one adjustment that matters most for
+THIS face (e.g. hooded eyes -> place shadow above the crease so it stays visible open).
+
+(2) "regions" — where the features sit, so the app can paint makeup onto the photo.
+Every region is an ELLIPSE in coordinates NORMALIZED to the image: cx and rx are
+fractions of the image WIDTH, cy and ry are fractions of the image HEIGHT, both from
+0 (left/top) to 1 (right/bottom). "rot" is the ellipse rotation in degrees, positive
+clockwise, usually between -30 and 30.
+
+{
+  "lips":        {"cx":0,"cy":0,"rx":0,"ry":0,"rot":0},
+  "lip_upper":   {...},   "lip_lower":  {...},
+  "eye_left":    {...},   "eye_right":  {...},
+  "lid_left":    {...},   "lid_right":  {...},
+  "brow_left":   {...},   "brow_right": {...},
+  "cheek_left":  {...},   "cheek_right":{...},
+  "bone_left":   {...},   "bone_right": {...},
+  "jaw_left":    {...},   "jaw_right":  {...},
+  "nose":        {...},   "forehead":   {...},
+  "chin":        {...},   "face":       {...}
+}
+
+Region meanings — be precise, the app paints exactly here:
+- "lips": the whole mouth. "lip_upper"/"lip_lower": each lip alone.
+- "eye_left"/"eye_right": the visible eye opening. LEFT means the left side of the
+  IMAGE as you look at it, not the person's own left. Same for every paired region.
+- "lid_left"/"lid_right": the mobile eyelid above the eye, where shadow sits.
+- "brow_left"/"brow_right": the eyebrow itself.
+- "cheek_left"/"cheek_right": the apple of the cheek, where blush goes.
+- "bone_left"/"bone_right": the top of the cheekbone, where highlighter goes —
+  higher and further out than the apple.
+- "jaw_left"/"jaw_right": the hollow under the cheekbone along the jaw, for contour.
+- "nose": the bridge. "forehead": centre of the forehead. "chin": the chin.
+- "face": one ellipse covering the whole face, hairline to chin — used for base.
+
+Every region is REQUIRED. Estimate carefully from the photo; a region that is a few
+percent off still looks right once the app blurs the edges.
+
+If the face is not clearly visible, cropped, turned far to the side, or too dark to
+map, return exactly:
+{"error":"unclear_photo","message_he":"...","message_en":"..."}`;
+
+export async function analyzeFace(img) {
+  const out = await callClaude({
+    system: SYS_FACE,
+    content: [imageBlock(img), { type: 'text', text: 'Map this face.' }],
+    maxTokens: 4000,
+    effort: 'high',
+  });
+  if (out && out.error === 'unclear_photo') throw new AIError('unclear_photo', out);
+  return out;
+}
+
+/* ============================================================
+   4c · Body mapping — powers fit advice and the try-on preview
+   ============================================================ */
+const SYS_BODY = `You receive a full-length photo of the app owner, uploaded by them so the app
+can recommend cuts and place outfit pieces over the photo. Assess proportions the way a
+tailor or personal stylist would. Never identify the person or comment on their weight,
+attractiveness, or health — proportion and balance only, and always in neutral,
+constructive language.
+
+Return ONLY valid JSON, no fences.
+
+(1) "body" — the assessment:
+{
+  "shape": "hourglass|pear|apple|rectangle|inverted-triangle|trapezoid|oval|triangle",
+  "ratio": "balanced|shoulder-dominant|hip-dominant",
+  "proportions_he": "", "proportions_en": "",
+  "focus_he": "", "focus_en": "",
+  "fit_notes": [{"area":"tops|bottoms|dresses|outerwear|shoes|proportion",
+                 "advice_he":"","advice_en":""}],
+  "confidence": 0.0
+}
+"proportions" = what the proportions are (leg-to-torso, where the waist sits,
+shoulder vs hip width). "focus" = the single balancing principle for this figure.
+"fit_notes" = 3-5 concrete cut recommendations.
+
+Guiding principle: never "hide" — BALANCE. Add volume where you want width, add
+structure and vertical line where you want length.
+
+(2) "regions" — where the body sits, NORMALIZED to the image as boxes:
+{"head":{"x":0,"y":0,"w":0,"h":0}, "torso":{...}, "waist":{...},
+ "hips":{...}, "legs":{...}, "feet":{...}, "full":{...}}
+x and w are fractions of image WIDTH, y and h fractions of image HEIGHT, origin
+top-left. "torso" spans shoulders to waist, "legs" waist to ankle, "feet" the shoes,
+"full" the whole silhouette. Every region is REQUIRED.
+
+If the photo does not show a full standing body, return exactly:
+{"error":"unclear_photo","message_he":"...","message_en":"..."}`;
+
+export async function analyzeBody(img) {
+  const out = await callClaude({
+    system: SYS_BODY,
+    content: [imageBlock(img), { type: 'text', text: 'Map this body.' }],
+    maxTokens: 4000,
+    effort: 'high',
+  });
+  if (out && out.error === 'unclear_photo') throw new AIError('unclear_photo', out);
+  return out;
+}
+
+/* ============================================================
    5 · Beauty / grooming
    ============================================================ */
 const SYS_BEAUTY = `You are VESTRA's beauty advisor.
 
 Input: "profile" (gender presentation, age, skin undertone, skin depth, hair, eyes),
-"occasion", "time_of_day", optional "palette" from the outfit, optional "look_key".
+"occasion", "time_of_day", optional "palette" from the outfit, optional "look_key",
+and optional "face" — a real analysis of this person's own face. When "face" is
+present, tailor every step to it (hooded lids, thin lips, low contrast, olive
+undertone…) and say so in the instruction rather than giving generic advice.
 
 Offer makeup as an OPTION, never an obligation. If gender presentation is "men",
 default to grooming guidance (beard, hair, skincare, fragrance, nails) — but give full
@@ -352,14 +482,22 @@ Return ONLY valid JSON:
 {
  "look_key":"no-makeup|soft-definition|soft-evening|statement|editorial|grooming",
  "look_name_he":"","look_name_en":"",
- "steps":[{"area":"skin|eyes|brows|lips|cheeks|hair|beard|fragrance|nails",
+ "steps":[{"area":"skin|eyes|brows|lips|cheeks|contour|highlight|hair|beard|fragrance|nails",
+           "region":"face|lips|lip_upper|lip_lower|eye|lid|brow|cheek|bone|jaw|nose|forehead|chin|none",
+           "finish":"matte|satin|shimmer|sheer",
            "instruction_he":"","instruction_en":"",
            "product_type_he":"","product_type_en":"",
            "shade_he":"","shade_en":"","shade_hex":"#RRGGBB"}],
  "trend_note_he":"","trend_note_en":"",
  "duration_minutes":0,
  "longevity_tip_he":"","longevity_tip_en":""
-}`;
+}
+
+"region" tells the app where to paint this step on the user's photo — use "none" for
+anything with no colour on the face (hair, fragrance, nails, skincare prep). Paired
+regions ("eye", "lid", "brow", "cheek", "bone", "jaw") are painted on both sides
+automatically, so name them in the singular. "shade_hex" must be the actual product
+colour and is required for every step whose region is not "none".`;
 
 export function beautyLook(payload) {
   return callClaude({
