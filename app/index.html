@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=5">
+<meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#100E0D" media="(prefers-color-scheme: dark)">
+<meta name="description" content="VESTRA — your AI atelier. Photograph your wardrobe, get a complete look for any occasion, organize your closet and match your beauty.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="VESTRA">
+<title>VESTRA · Your AI Atelier</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..700;1,400..600&family=Inter:wght@400;500;600;700;800&family=Assistant:wght@400;500;600;700;800&family=Frank+Ruhl+Libre:wght@400;500;700&display=swap">
+
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/animations.css">
+<link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+
+<!-- ══ Splash ══ -->
+<div id="splash">
+  <div class="splash-inner">
+    <div class="splash-word"><span>V</span><span>E</span><span>S</span><span>T</span><span>R</span><span>A</span></div>
+    <div class="splash-line"></div>
+    <div class="splash-tag">Your AI Atelier</div>
+  </div>
+</div>
+
+<!-- ══ App bar ══ -->
+<header class="appbar" id="appbar">
+  <div class="row between g3">
+    <div class="brand">
+      <span class="brand-mark"><span class="v">V</span>ESTRA</span>
+      <span class="brand-sub" data-t="tagline"></span>
+    </div>
+    <div class="row g2">
+      <div class="lang-toggle" id="langToggle">
+        <button data-lang="he">עב</button>
+        <button data-lang="en">EN</button>
+      </div>
+      <button class="icon-btn" id="themeBtn" data-taria="p_theme"></button>
+    </div>
+  </div>
+</header>
+
+<!-- ══ Views ══ -->
+<main id="app">
+  <section class="view" id="view-home"     data-view="home"></section>
+  <section class="view" id="view-wardrobe" data-view="wardrobe"></section>
+  <section class="view" id="view-capture"  data-view="capture"></section>
+  <section class="view" id="view-studio"   data-view="studio"></section>
+  <section class="view" id="view-closet"   data-view="closet"></section>
+  <section class="view" id="view-beauty"   data-view="beauty"></section>
+  <section class="view" id="view-profile"  data-view="profile"></section>
+</main>
+
+<!-- ══ Bottom navigation ══ -->
+<nav class="tabbar" id="tabbar" aria-label="Primary">
+  <button class="tab" data-goto="home">      <span class="ic"></span><span data-t="nav_home"></span></button>
+  <button class="tab" data-goto="wardrobe">  <span class="ic"></span><span data-t="nav_wardrobe"></span></button>
+  <button class="tab tab-shoot" data-goto="capture">
+    <span class="shoot-btn"></span>
+  </button>
+  <button class="tab" data-goto="studio">    <span class="ic"></span><span data-t="nav_studio"></span></button>
+  <button class="tab" data-goto="profile">   <span class="ic"></span><span data-t="nav_me"></span></button>
+</nav>
+
+<div id="toasts"></div>
+
+<input type="file" id="filePicker" accept="image/*" hidden>
+<input type="file" id="cameraPicker" accept="image/*" capture="environment" hidden>
+<input type="file" id="importPicker" accept="application/json,.json" hidden>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

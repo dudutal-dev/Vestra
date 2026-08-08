@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="VESTRA">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"  stop-color="#FBFAF7"/>
+      <stop offset="55%" stop-color="#F2ECE2"/>
+      <stop offset="100%" stop-color="#E6DCCC"/>
+    </linearGradient>
+    <linearGradient id="lux" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#6E1F28"/>
+      <stop offset="55%"  stop-color="#8E3340"/>
+      <stop offset="100%" stop-color="#C39A6B"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="404" cy="108" r="128" fill="#C6A667" opacity=".18"/>
+
+  <!-- Hanger -->
+  <g fill="none" stroke="#14110F" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" opacity=".16">
+    <path d="M256 148a30 30 0 0 0-24 48l24 24"/>
+    <path d="M256 220 130 313a18 18 0 0 0 11 33h230a18 18 0 0 0 11-33L256 220Z"/>
+  </g>
+
+  <!-- V -->
+  <path d="M150 168 L256 386 L362 168" fill="none" stroke="url(#lux)"
+        stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <circle cx="256" cy="424" r="13" fill="#C6A667"/>
+</svg>
