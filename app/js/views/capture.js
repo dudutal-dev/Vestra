@@ -10,6 +10,7 @@ import { Items, Closets, Media, newId, hasKey, getProfile, setProfile } from '..
 import {
   compressImage, catalogItem, analyzeCloset, analyzeFace, analyzeBody, errText, AIError,
 } from '../ai.js';
+import { analyzeFaceLocal, analyzeBodyLocal } from '../vision.js';
 import {
   CATEGORIES, SUBCATS, SUBCAT_NAMES, FITS, FIT_NAMES, PATTERNS, PATTERN_NAMES,
   FABRICS, FABRIC_NAMES, FORMALITY, SEASONS, catName, subName, lbl, hexFor,
@@ -21,6 +22,11 @@ const MODES = [
   { key: 'face',   tKey: 'mode_face' },
   { key: 'body',   tKey: 'mode_body' },
 ];
+
+/* Modes the on-device engine can handle, so an owner with no API key is not
+   left holding a photo the app refuses to do anything with. Closet analysis
+   has no local equivalent and says so instead. */
+const OFFLINE_MODES = new Set(['face', 'body']);
 
 const COPY = {
   item:   { sub: 'capture_sub',      hintT: 'shot_hint_t', hintS: 'shot_hint_s', cta: 'analyze',      busy: 'scanning' },
@@ -80,18 +86,21 @@ export function renderCapture(root, ctx) {
 
   const privacyNote = (mode === 'face' || mode === 'body') ? el('div', { class: 'alert alert-ok' },
     el('span', { html: icon('check') }),
-    el('div', { text: t('photos_privacy') }),
+    // Without a key nothing is uploaded at all, and saying otherwise would be
+    // both wrong and needlessly alarming.
+    el('div', { text: hasKey() ? t('photos_privacy') : t('photos_privacy_local') }),
   ) : null;
 
   const existing = (mode === 'face' && state.face) || (mode === 'body' && state.body)
     ? existingCard(mode === 'face' ? state.face : state.body, mode, ctx)
     : null;
 
-  const keyBanner = hasKey() ? null : el('div', { class: 'alert alert-med' },
-    el('span', { html: icon('key') }),
+  const offlineHere = !hasKey() && OFFLINE_MODES.has(mode);
+  const keyBanner = hasKey() ? null : el('div', { class: `alert ${offlineHere ? 'alert-ok' : 'alert-med'}` },
+    el('span', { html: icon(offlineHere ? 'check' : 'key') }),
     el('div', { class: 'grow' },
-      el('b', { text: t('no_key_t') }),
-      el('div', { style: { marginTop: '4px' }, text: t('no_key_s') }),
+      el('b', { text: offlineHere ? t('on_device_t') : t('no_key_t') }),
+      el('div', { style: { marginTop: '4px' }, text: offlineHere ? t('on_device_s') : t('no_key_s') }),
       el('button', {
         class: 'btn btn-sm btn-ghost', style: { marginTop: '10px' },
         text: t('open_settings'), onclick: () => ctx.go('profile'),
@@ -145,11 +154,16 @@ export function renderCapture(root, ctx) {
   function showShot(img) {
     zone.classList.add('has-img');
     zone.replaceChildren(el('span', { class: 'br' }), el('img', { src: img.dataUrl, alt: '' }));
-    analyzeBtn.classList.toggle('hidden', !hasKey());
+    // Face and body run on the device, so the button stays live without a key.
+    analyzeBtn.classList.toggle('hidden', !hasKey() && !OFFLINE_MODES.has(mode));
     retakeBtn.classList.remove('hidden');
-    if (!hasKey() && mode === 'item') {
+    if (hasKey()) return;
+
+    if (mode === 'item') {
       toast(t('offline_mode'), 'warn');
       openManualForm(ctx, img);
+    } else if (mode === 'closet') {
+      toast(t('need_key_closet'), 'warn');
     }
   }
 
@@ -227,10 +241,11 @@ export function renderCapture(root, ctx) {
         ctx.go('closet');
 
       } else if (mode === 'face') {
-        const res = await analyzeFace(shot);
+        const res = hasKey() ? await analyzeFace(shot) : await analyzeFaceLocal(shot);
         await Media.put({
           slot: 'face', createdAt: Date.now(), photo: shot.dataUrl,
           w: shot.w, h: shot.h, face: res.face || null, regions: res.regions || null,
+          engine: res.engine || 'ai',
         });
         await refreshMedia();
         syncProfileFromFace(res.face);
@@ -240,10 +255,11 @@ export function renderCapture(root, ctx) {
         ctx.go('beauty');
 
       } else if (mode === 'body') {
-        const res = await analyzeBody(shot);
+        const res = hasKey() ? await analyzeBody(shot) : await analyzeBodyLocal(shot, state.profile);
         await Media.put({
           slot: 'body', createdAt: Date.now(), photo: shot.dataUrl,
           w: shot.w, h: shot.h, body: res.body || null, regions: res.regions || null,
+          engine: res.engine || 'ai',
         });
         await refreshMedia();
         syncProfileFromBody(res.body);
@@ -293,7 +309,10 @@ function existingCard(rec, mode, ctx) {
     el('div', { class: 'grow' },
       el('div', { class: 'eyebrow', text: mode === 'face' ? t('p_face_photo') : t('p_body_photo') }),
       el('div', { class: 'slot-name', text: a?.shape || '—' }),
-      el('div', { class: 'micro muted', text: new Date(rec.createdAt).toLocaleDateString(isHe() ? 'he-IL' : 'en-GB') }),
+      el('div', { class: 'micro muted', text: [
+        rec.createdAt ? new Date(rec.createdAt).toLocaleDateString(isHe() ? 'he-IL' : 'en-GB') : null,
+        rec.engine === 'local' ? t('on_device_tag') : null,
+      ].filter(Boolean).join(' · ') }),
     ),
     el('button', {
       class: 'icon-btn', html: icon('trash'), 'aria-label': t('remove_photo'),

@@ -483,6 +483,7 @@ Return ONLY valid JSON:
  "look_key":"no-makeup|soft-definition|soft-evening|statement|editorial|grooming",
  "look_name_he":"","look_name_en":"",
  "steps":[{"area":"skin|eyes|brows|lips|cheeks|contour|highlight|hair|beard|fragrance|nails",
+           "technique":"base|lipstick|liner|lashes|brow|shadow|blush|contour|highlight|none",
            "region":"face|lips|lip_upper|lip_lower|eye|lid|brow|cheek|bone|jaw|nose|forehead|chin|none",
            "finish":"matte|satin|shimmer|sheer",
            "instruction_he":"","instruction_en":"",
@@ -497,7 +498,13 @@ Return ONLY valid JSON:
 anything with no colour on the face (hair, fragrance, nails, skincare prep). Paired
 regions ("eye", "lid", "brow", "cheek", "bone", "jaw") are painted on both sides
 automatically, so name them in the singular. "shade_hex" must be the actual product
-colour and is required for every step whose region is not "none".`;
+colour and is required for every step whose region is not "none".
+
+"technique" tells the app what SHAPE to draw, which matters more than the region: a
+liner is a stroke along the lash line, a lipstick follows the lip outline, a blush is
+a soft wash. Give exactly ONE technique per step — if a step would carry two ("shadow
+plus liner", "contour plus highlighter"), split it into two steps so each can be drawn
+and followed separately. Use "none" for hair, beard, fragrance, nails and skincare.`;
 
 export function beautyLook(payload) {
   return callClaude({

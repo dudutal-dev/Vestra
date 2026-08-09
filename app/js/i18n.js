@@ -150,6 +150,12 @@ export const DICT = {
     offline_mode: 'מצב ללא AI',
     local_engine: 'נבנה במנוע המקומי',
     ai_engine: 'נבנה ע״י Claude',
+    on_device_t: 'ניתוח על המכשיר',
+    on_device_s: 'בלי מפתח API הניתוח רץ כאן בדפדפן ולא יוצא מהמכשיר. הוא מספיק כדי להפעיל את ההדמייה, אבל פחות מדויק מהניתוח של Claude.',
+    on_device_tag: 'נותח על המכשיר',
+    need_key_closet: 'ניתוח ארון דורש מפתח API — אין לו מקבילה מקומית.',
+    makeup_only: 'איפור בלבד',
+    makeup_only_sub: 'בלי לבנות לוק — רק המלצת איפור לאירוע',
     err_network: 'אין חיבור לרשת',
     err_key: 'המפתח לא תקין — בדוק בהגדרות',
     err_rate: 'יותר מדי בקשות — מנסה שוב…',
@@ -206,6 +212,7 @@ export const DICT = {
     remove_photo: 'מחק תמונה',
     photo_removed: 'התמונה נמחקה',
     photos_privacy: 'תמונות הפנים והגוף נשמרות במכשיר שלך בלבד, ונשלחות ל-Anthropic רק כשאתה מריץ ניתוח.',
+    photos_privacy_local: 'תמונות הפנים והגוף נשמרות במכשיר שלך בלבד. בלי מפתח API הן גם לא נשלחות לשום מקום — הניתוח כולו רץ כאן.',
 
     /* ---- backup ---- */
     export_photos_q: 'לכלול גם את תמונות הפנים והגוף? הקובץ יהיה גדול יותר ויכיל תמונות שלך.',
@@ -368,6 +375,12 @@ export const DICT = {
     offline_mode: 'No-AI mode',
     local_engine: 'Built by the local engine',
     ai_engine: 'Built by Claude',
+    on_device_t: 'On-device analysis',
+    on_device_s: 'With no API key the analysis runs here in the browser and never leaves the device. It is enough to drive the simulation, but less precise than Claude\'s.',
+    on_device_tag: 'Analysed on device',
+    need_key_closet: 'Closet analysis needs an API key — it has no local equivalent.',
+    makeup_only: 'Makeup only',
+    makeup_only_sub: 'Skip the outfit — just the makeup for this occasion',
     err_network: 'No network connection',
     err_key: 'Invalid API key — check settings',
     err_rate: 'Too many requests — retrying…',
@@ -424,6 +437,7 @@ export const DICT = {
     remove_photo: 'Delete photo',
     photo_removed: 'Photo deleted',
     photos_privacy: 'Your face and body photos stay on this device, and are sent to Anthropic only when you run an analysis.',
+    photos_privacy_local: 'Your face and body photos stay on this device. With no API key they are not sent anywhere at all — the whole analysis runs here.',
 
     /* ---- backup ---- */
     export_photos_q: 'Include your face and body photos? The file will be larger and will contain pictures of you.',

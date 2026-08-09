@@ -67,6 +67,18 @@ export function renderStudio(root, ctx) {
     onclick: (e) => run(e),
   });
 
+  // Beauty on its own. The occasion still sets the register, but nothing here
+  // reads the wardrobe, so an empty closet is no reason to be turned away.
+  const makeupBtn = el('button', {
+    class: 'btn btn-ghost btn-block',
+    html: icon('lipstick') + `<span>${esc(t('makeup_only'))}</span>`,
+    onclick: () => {
+      if (!r.occasion) return toast(t('need_occasion'), 'warn');
+      buzz();
+      ctx.go('beauty');
+    },
+  });
+
   root.replaceChildren(
     el('div', { class: 'pad stack g5', style: { paddingTop: 'var(--s4)' } },
       el('div', {},
@@ -80,6 +92,10 @@ export function renderStudio(root, ctx) {
       block(t('st_mood'), moodSeg),
       block(t('st_notes'), notes),
       buildBtn,
+      el('div', { class: 'stack g1' },
+        makeupBtn,
+        el('p', { class: 'micro muted', style: { margin: '2px 0 0', textAlign: 'center' }, text: t('makeup_only_sub') }),
+      ),
     ),
   );
   observeReveal(root);

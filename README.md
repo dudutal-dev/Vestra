@@ -45,7 +45,7 @@ Shoot your closet standing open. You get zone mapping with occupancy percentages
 ### 💄 Beauty — simulated on your own face
 Upload one front-facing photo and Claude maps your features — face shape, undertone, skin depth, contrast, eye shape, lip fullness — plus the exact regions of your lips, lids, brows, cheeks, cheekbones and jaw.
 
-The app then **paints the look onto your photo**: a before/after wipe with an intensity slider, rendered on canvas with per-product blend modes. Blend mode is chosen from the skin tone actually sampled under each region, so blush reads correctly on fair and deep skin alike. Five makeup looks plus a grooming track, all current to F/W 26-27: oxblood lips, deliberate imperfection, smudged smokey, monochromatic face, double cat-eye, cosmic highlighter.
+The app then **paints the look onto your photo**: a before/after wipe with an intensity slider, and every product drawn as the shape it actually is: a lipstick follows the lip outline with a cupid's bow and leaves the mouth line readable, eyeliner is a tapered stroke along the lash line with a wing when the look calls for one, mascara is short strokes rather than a smear, brows taper from head to tail, and foundation evens the skin with a softened copy of itself before any colour goes on. Blend mode is chosen from the skin tone sampled under each region, so blush reads correctly on fair and deep skin alike, and everything is masked to the face so nothing tints your hair. Five makeup looks plus a grooming track, all current to F/W 26-27: oxblood lips, deliberate imperfection, smudged smokey, monochromatic face, double cat-eye, cosmic highlighter.
 
 ### 🪞 See the look on you
 Upload a full-length photo and you get body shape, shoulder-to-hip ratio, proportions and concrete cut advice — plus the outfit **positioned over your own photo** with an opacity slider, and a **downloadable lookbook** card (1080×1350) with the pieces, palette and styling note.
@@ -62,6 +62,8 @@ Hebrew (RTL) and English (LTR) throughout — including the AI's own output, whi
 
 ### 🔌 Works without an API key
 No key? The built-in **rules engine** still builds looks, pairs items, and runs the health report locally — using the same scoring model as the skill. Cataloguing falls back to a full manual form. Add a key whenever you want automatic recognition.
+
+**Your face and body are read on the device too.** With no key, VESTRA analyses both photos in the browser and nothing is uploaded at all. Skin is segmented in chroma to find the face; the eyes are located by the sclera rather than by darkness, because a brow is darker than an iris; lips are found by being redder than the skin around them; and the remaining regions — lid, cheek, cheekbone, jaw — are derived from those anchors by proportion, the way a makeup artist maps a face. For the body, the silhouette is separated from the background and its width at each height gives shoulders, waist and hips, which is what body shape is defined by in the first place. It is an estimate, the app labels it as one, and when a photo can't support a conclusion it says so instead of inventing one.
 
 It holds the same seven gates, and reads your profile the same way. Your **coverage level** and **never-wearing** list remove pieces before scoring rather than merely discouraging them. **Fabric is judged against the weather** — wool and heavy layers leave a hot day on their own. Your **body shape** moves where volume and interest land: up top for a pear, down for an inverted triangle, a long vertical line for an apple, a defined waist for a rectangle. And the same request always returns the same look.
 
@@ -159,6 +161,7 @@ vestra/
 │       ├── i18n.js               # Hebrew/English dictionary
 │       ├── taxonomy.js           # categories, occasions, formality, palettes
 │       ├── ai.js                 # Claude client + prompts + image compression
+│       ├── vision.js             # on-device face & body analysis — no key needed
 │       ├── stylist.js            # offline rules engine
 │       ├── makeup.js             # canvas makeup renderer (adaptive blend modes)
 │       ├── tryon.js              # garment placement + lookbook export

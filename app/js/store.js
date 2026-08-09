@@ -43,7 +43,11 @@ function tx(store, mode, fn) {
     const s = t.objectStore(store);
     let out;
     try { out = fn(s); } catch (e) { reject(e); return; }
-    t.oncomplete = () => resolve(out && out.result !== undefined ? out.result : out);
+    // Unwrap the request, including when it found nothing. Testing
+    // `result !== undefined` instead resolved a miss with the IDBRequest
+    // itself — a truthy object carrying none of the fields callers check,
+    // which is why a face that had never been uploaded still rendered a card.
+    t.oncomplete = () => resolve(out instanceof IDBRequest ? out.result : out);
     t.onerror    = () => reject(t.error);
     t.onabort    = () => reject(t.error);
   }));

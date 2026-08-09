@@ -16,11 +16,11 @@ const LOCAL = {
   'no-makeup': {
     look_name_he: 'No-Makeup', look_name_en: 'No-Makeup', duration_minutes: 5,
     steps: [
-      { area: 'skin', instruction_he: 'סקין-טינט דק בשכבה אחת, קונסילר נקודתי בלבד', instruction_en: 'A single thin layer of skin tint, concealer only where needed', shade_hex: '#E8CBB4' },
-      { area: 'brows', instruction_he: 'ג׳ל גבות שקוף — לסרק כלפי מעלה', instruction_en: 'Clear brow gel, brushed upward', shade_hex: '#6B4F3F' },
-      { area: 'cheeks', instruction_he: 'קרם-בלאש אפרסק, לטפוח באצבע', instruction_en: 'Cream blush in peach, pressed in with a finger', shade_hex: '#E8A183' },
-      { area: 'eyes', instruction_he: 'מסקרה חומה, שכבה אחת', instruction_en: 'Brown mascara, one coat', shade_hex: '#4A3228' },
-      { area: 'lips', instruction_he: 'באלם עם גוון', instruction_en: 'Tinted balm', shade_hex: '#C98C86' },
+      { area: 'skin', technique: 'base', finish: 'natural', instruction_he: 'סקין-טינט דק בשכבה אחת, קונסילר נקודתי בלבד', instruction_en: 'A single thin layer of skin tint, concealer only where needed', shade_hex: '#E8CBB4' },
+      { area: 'brows', technique: 'brow', instruction_he: 'ג׳ל גבות שקוף — לסרק כלפי מעלה', instruction_en: 'Clear brow gel, brushed upward', shade_hex: '#6B4F3F' },
+      { area: 'cheeks', technique: 'blush', instruction_he: 'קרם-בלאש אפרסק, לטפוח באצבע', instruction_en: 'Cream blush in peach, pressed in with a finger', shade_hex: '#E8A183' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה חומה, שכבה אחת', instruction_en: 'Brown mascara, one coat', shade_hex: '#4A3228' },
+      { area: 'lips', technique: 'lipstick', finish: 'satin', instruction_he: 'באלם עם גוון', instruction_en: 'Tinted balm', shade_hex: '#C98C86' },
     ],
     trend_he: 'עור נקי וזוהר — הכיוון של Cloud Dancer 2026',
     trend_en: 'Clean luminous skin — the Cloud Dancer 2026 direction',
@@ -30,11 +30,13 @@ const LOCAL = {
   'soft-definition': {
     look_name_he: 'Soft Definition', look_name_en: 'Soft Definition', duration_minutes: 10,
     steps: [
-      { area: 'skin', instruction_he: 'פאונדיישן בכיסוי בינוני, פודרה רק ב-T', instruction_en: 'Medium-coverage foundation, powder on the T-zone only', shade_hex: '#E3C3A8' },
-      { area: 'eyes', instruction_he: 'צללית ניוד על כל העפעף, אייליינר חום דק בקו הריסים', instruction_en: 'Nude shadow across the lid, thin brown liner along the lashline', shade_hex: '#8A6A55' },
-      { area: 'eyes', instruction_he: 'מסקרה שחורה, שתי שכבות', instruction_en: 'Black mascara, two coats', shade_hex: '#14110F' },
-      { area: 'cheeks', instruction_he: 'בלאש ורוד + היילייטר עדין על עצם הלחי', instruction_en: 'Pink blush plus a soft highlighter on the cheekbone', shade_hex: '#D98F9E' },
-      { area: 'lips', instruction_he: 'ורוד-חום מאט', instruction_en: 'Matte rose-brown', shade_hex: '#A9695E' },
+      { area: 'skin', technique: 'base', instruction_he: 'פאונדיישן בכיסוי בינוני, פודרה רק ב-T', instruction_en: 'Medium-coverage foundation, powder on the T-zone only', shade_hex: '#E3C3A8' },
+      { area: 'eyes', technique: 'shadow', instruction_he: 'צללית ניוד על כל העפעף', instruction_en: 'Nude shadow across the lid', shade_hex: '#8A6A55' },
+      { area: 'eyes', technique: 'liner', instruction_he: 'אייליינר חום דק בקו הריסים', instruction_en: 'A thin brown liner along the lash line', shade_hex: '#5A3E2E' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה שחורה, שתי שכבות', instruction_en: 'Black mascara, two coats', shade_hex: '#14110F' },
+      { area: 'cheeks', technique: 'blush', finish: 'satin', instruction_he: 'בלאש ורוד על תפוח הלחי', instruction_en: 'Pink blush on the apple of the cheek', shade_hex: '#D98F9E' },
+      { area: 'highlight', technique: 'highlight', finish: 'shimmer', instruction_he: 'היילייטר עדין על עצם הלחי', instruction_en: 'A soft highlighter along the cheekbone', shade_hex: '#F3DCC4' },
+      { area: 'lips', technique: 'lipstick', finish: 'matte', instruction_he: 'ורוד-חום מאט', instruction_en: 'Matte rose-brown', shade_hex: '#A9695E' },
     ],
     trend_he: 'הגדרה רכה — מספיק למצלמה, לא יותר מדי לפגישה',
     trend_en: 'Soft definition — enough for camera, not too much for a meeting',
@@ -44,11 +46,13 @@ const LOCAL = {
   'soft-evening': {
     look_name_he: 'Soft Evening', look_name_en: 'Soft Evening', duration_minutes: 18,
     steps: [
-      { area: 'skin', instruction_he: 'כיסוי בינוני-מלא עם גימור סטין', instruction_en: 'Medium-to-full coverage with a satin finish', shade_hex: '#DFBB9F' },
-      { area: 'eyes', instruction_he: 'אייליינר מרוח בכוונה (smudged) + צלליות חמות בקמט', instruction_en: 'Deliberately smudged liner plus warm shadow in the crease', shade_hex: '#6B4536' },
-      { area: 'eyes', instruction_he: 'ריסים — שכבה כפולה או ריסי פינה', instruction_en: 'Lashes — double coat or corner lashes', shade_hex: '#14110F' },
-      { area: 'cheeks', instruction_he: 'קונטור עדין מתחת לעצם + בלאש חם', instruction_en: 'Soft contour under the bone plus a warm blush', shade_hex: '#B57A63' },
-      { area: 'lips', instruction_he: 'חום-אדמדם או רוז׳ עמוק', instruction_en: 'Red-brown or a deep rose', shade_hex: '#8E4438' },
+      { area: 'skin', technique: 'base', instruction_he: 'כיסוי בינוני-מלא עם גימור סטין', instruction_en: 'Medium-to-full coverage with a satin finish', shade_hex: '#DFBB9F' },
+      { area: 'eyes', technique: 'shadow', instruction_he: 'צלליות חמות בקמט', instruction_en: 'Warm shadow through the crease', shade_hex: '#6B4536' },
+      { area: 'eyes', technique: 'liner', instruction_he: 'אייליינר מרוח בכוונה (smudged)', instruction_en: 'Deliberately smudged liner', shade_hex: '#2A1E18' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'ריסים — שכבה כפולה או ריסי פינה', instruction_en: 'Lashes — double coat or corner lashes', shade_hex: '#14110F' },
+      { area: 'cheeks', technique: 'blush', instruction_he: 'בלאש חם על תפוח הלחי', instruction_en: 'A warm blush on the apple of the cheek', shade_hex: '#B57A63' },
+      { area: 'contour', technique: 'contour', instruction_he: 'קונטור עדין מתחת לעצם הלחי', instruction_en: 'A soft contour under the cheekbone', shade_hex: '#8A6249' },
+      { area: 'lips', technique: 'lipstick', finish: 'satin', instruction_he: 'חום-אדמדם או רוז׳ עמוק', instruction_en: 'Red-brown or a deep rose', shade_hex: '#8E4438' },
     ],
     trend_he: 'Deliberate Imperfection — הכיוון המרכזי של F/W 26-27',
     trend_en: 'Deliberate imperfection — the defining mood of F/W 26-27',
@@ -58,11 +62,12 @@ const LOCAL = {
   statement: {
     look_name_he: 'Statement', look_name_en: 'Statement', duration_minutes: 25,
     steps: [
-      { area: 'skin', instruction_he: 'כיסוי מלא, מקובע בפודרה ובספריי', instruction_en: 'Full coverage, set with powder and spray', shade_hex: '#DDB89B' },
-      { area: 'lips', instruction_he: 'Oxblood — אדום עמוק עם אנדרטון חום-סגול. עיפרון בקו ואז מילוי.', instruction_en: 'Oxblood — deep red with a brown-purple undertone. Line first, then fill.', shade_hex: '#6E1F28' },
-      { area: 'eyes', instruction_he: 'כאן בוחרים אחד: אם השפה כהה — העין נשארת שקטה (ניוד + מסקרה).', instruction_en: 'Pick one: with a dark lip the eye stays quiet — nude shadow and mascara.', shade_hex: '#9C8574' },
-      { area: 'cheeks', instruction_he: 'קונטור + היילייטר קוסמי רב-גוני', instruction_en: 'Contour plus a multi-tonal cosmic highlighter', shade_hex: '#C6A667' },
-      { area: 'brows', instruction_he: 'גבות מלאות ומוגדרות', instruction_en: 'Full, defined brows', shade_hex: '#4A3228' },
+      { area: 'skin', technique: 'base', instruction_he: 'כיסוי מלא, מקובע בפודרה ובספריי', instruction_en: 'Full coverage, set with powder and spray', shade_hex: '#DDB89B' },
+      { area: 'lips', technique: 'lipstick', finish: 'satin', instruction_he: 'Oxblood — אדום עמוק עם אנדרטון חום-סגול. עיפרון בקו ואז מילוי.', instruction_en: 'Oxblood — deep red with a brown-purple undertone. Line first, then fill.', shade_hex: '#6E1F28' },
+      { area: 'eyes', technique: 'shadow', instruction_he: 'כאן בוחרים אחד: אם השפה כהה — העין נשארת שקטה (ניוד + מסקרה).', instruction_en: 'Pick one: with a dark lip the eye stays quiet — nude shadow and mascara.', shade_hex: '#9C8574' },
+      { area: 'contour', technique: 'contour', instruction_he: 'קונטור מתחת לעצם הלחי', instruction_en: 'Contour under the cheekbone', shade_hex: '#8C6046' },
+      { area: 'highlight', technique: 'highlight', finish: 'shimmer', instruction_he: 'היילייטר קוסמי רב-גוני על עצם הלחי', instruction_en: 'A multi-tonal cosmic highlighter on the bone', shade_hex: '#C6A667' },
+      { area: 'brows', technique: 'brow', instruction_he: 'גבות מלאות ומוגדרות', instruction_en: 'Full, defined brows', shade_hex: '#4A3228' },
     ],
     trend_he: 'Oxblood Lip — סיפור השפתיים של העונה (Saint Laurent, Elie Saab, Carven)',
     trend_en: 'The oxblood lip — the season\'s lip story (Saint Laurent, Elie Saab, Carven)',
@@ -72,10 +77,10 @@ const LOCAL = {
   editorial: {
     look_name_he: 'Editorial', look_name_en: 'Editorial', duration_minutes: 35,
     steps: [
-      { area: 'eyes', instruction_he: 'Double cat-eye — שני קווים מקבילים, או מתפצלים לכיוונים שונים', instruction_en: 'Double cat-eye — two parallel wings, or two splitting in different directions', shade_hex: '#14110F' },
-      { area: 'eyes', instruction_he: 'לחלופין: מונוכרום — צבע רווי אחד על עפעף, לחי ושפה', instruction_en: 'Alternatively: monochrome — one saturated colour across lid, cheek and lip', shade_hex: '#B9A3C4' },
-      { area: 'skin', instruction_he: 'עור זוהר עם ברק רב-גוני על נקודות הגובה', instruction_en: 'Luminous skin with multi-tonal shine on the high points', shade_hex: '#E8D5C0' },
-      { area: 'lips', instruction_he: 'לפי הקונספט — או שקוף לגמרי או רווי לגמרי', instruction_en: 'By concept — either fully sheer or fully saturated', shade_hex: '#C2317C' },
+      { area: 'eyes', technique: 'liner', instruction_he: 'Double cat-eye — שני קווים מקבילים, או מתפצלים לכיוונים שונים', instruction_en: 'Double cat-eye — two parallel wings, or two splitting in different directions', shade_hex: '#14110F' },
+      { area: 'eyes', technique: 'shadow', finish: 'shimmer', instruction_he: 'לחלופין: מונוכרום — צבע רווי אחד על עפעף, לחי ושפה', instruction_en: 'Alternatively: monochrome — one saturated colour across lid, cheek and lip', shade_hex: '#B9A3C4' },
+      { area: 'skin', technique: 'base', finish: 'shimmer', instruction_he: 'עור זוהר עם ברק רב-גוני על נקודות הגובה', instruction_en: 'Luminous skin with multi-tonal shine on the high points', shade_hex: '#E8D5C0' },
+      { area: 'lips', technique: 'lipstick', finish: 'glossy', instruction_he: 'לפי הקונספט — או שקוף לגמרי או רווי לגמרי', instruction_en: 'By concept — either fully sheer or fully saturated', shade_hex: '#C2317C' },
     ],
     trend_he: 'Double Cat-Eye · Monochromatic Face · Cosmic Highlighter',
     trend_en: 'Double cat-eye · monochromatic face · cosmic highlighter',
@@ -98,9 +103,26 @@ const LOCAL = {
   },
 };
 
+/* Areas that only apply to one presentation. Someone who set their profile to
+   women should not be offered a beard track, and should not have to scroll
+   past one inside a look either. */
+const AREA_FOR = { beard: ['men', 'non-binary'] };
+
+const areaApplies = (area, presentation) => {
+  const allowed = AREA_FOR[(area || '').toLowerCase()];
+  return !allowed || allowed.includes(presentation);
+};
+
+const visibleSteps = (look, presentation) =>
+  (look?.steps || []).filter(s => areaApplies(s.area, presentation));
+
 export function renderBeauty(root, ctx) {
   const fromLook = ctx.opts?.look || null;
-  const isMen = state.profile.gender_presentation === 'men';
+  const presentation = state.profile.gender_presentation || 'women';
+  const isMen = presentation === 'men';
+  // The grooming track is a beard-and-shave routine; it has no place in a
+  // menu for someone who told us they don't want one.
+  const looks = BEAUTY_LOOKS.filter(b => b.key !== 'grooming' || presentation !== 'women');
   const suggested = fromLook?.makeup_look
     || (state.request.occasion ? OCCASION_BEAUTY[state.request.occasion] : null)
     || (isMen ? 'grooming' : 'soft-definition');
@@ -108,7 +130,7 @@ export function renderBeauty(root, ctx) {
   const host = el('div', { class: 'stack g5' });
 
   const cards = el('div', { class: 'stack g3 stagger' },
-    BEAUTY_LOOKS.map(b => el('button', {
+    looks.map(b => el('button', {
       class: `beauty-card ${state.beauty?.look_key === b.key ? 'is-on' : ''}`,
       style: { '--bloom': b.bloom, textAlign: 'start' },
       onclick: () => run(b.key),
@@ -156,7 +178,7 @@ export function renderBeauty(root, ctx) {
   async function run(key) {
     buzz();
     [...cards.children].forEach(n => n.classList.remove('is-on'));
-    cards.children[BEAUTY_LOOKS.findIndex(b => b.key === key)]?.classList.add('is-on');
+    cards.children[looks.findIndex(b => b.key === key)]?.classList.add('is-on');
 
     host.replaceChildren(skeleton());
 
@@ -185,8 +207,9 @@ export function renderBeauty(root, ctx) {
   }
 
   function paint(d) {
+    const steps = visibleSteps(d, presentation);
     host.replaceChildren(...[
-      simulationBlock(d, ctx),
+      simulationBlock({ ...d, steps }, ctx),
       faceCard(),
       el('article', { class: 'look-card' },
         el('div', { class: 'look-head' },
@@ -198,7 +221,7 @@ export function renderBeauty(root, ctx) {
           ) : null,
         ),
         el('div', { class: 'look-slots' },
-          (d.steps || []).map(s => el('div', { class: 'slot' },
+          steps.map(s => el('div', { class: 'slot' },
             el('span', { class: 'shade-dot', style: { background: s.shade_hex || 'var(--cloud-3)' } }),
             el('div', { class: 'grow' },
               el('div', { class: 'slot-role', text: s.area }),
@@ -303,7 +326,12 @@ function faceCard() {
     : null;
 
   return el('section', { class: 'card' },
-    el('div', { class: 'eyebrow', style: { marginBottom: 'var(--s3)' }, text: t('face_analysis') }),
+    el('div', { class: 'row between g2', style: { marginBottom: 'var(--s3)' } },
+      el('div', { class: 'eyebrow', text: t('face_analysis') }),
+      // Say which engine read the face — an on-device map is a good estimate,
+      // not the same thing as Claude looking at the photo.
+      state.face?.engine === 'local' ? el('span', { class: 'tag', text: t('on_device_tag') }) : null,
+    ),
     el('dl', { style: { margin: 0 } },
       row(t('f_face_shape'), f.shape),
       row(t('p_undertone'), f.skin_undertone),
@@ -331,6 +359,8 @@ function localLook(key) {
     duration_minutes: src.duration_minutes,
     steps: src.steps.map(s => ({
       area: s.area,
+      technique: s.technique || null,
+      finish: s.finish || null,
       instruction_he: s.instruction_he, instruction_en: s.instruction_en,
       product_type_he: '', product_type_en: '',
       shade_he: '', shade_en: '', shade_hex: s.shade_hex,
