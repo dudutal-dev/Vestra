@@ -9,6 +9,7 @@ import { hasKey } from '../store.js';
 import { beautyLook, errText } from '../ai.js';
 import { renderMakeup, loadImage } from '../makeup.js';
 import { downloadCanvas } from '../tryon.js';
+import { openMakeupBrief } from './brief.js';
 import { BEAUTY_LOOKS, OCCASION_BEAUTY, OCCASIONS, occName, lbl } from '../taxonomy.js';
 
 /* Offline reference looks — SKILL.md Module 7.2 / 7.3 */
@@ -283,6 +284,7 @@ function simulationBlock(look, ctx) {
     oninput: (e) => { intensity = +e.target.value / 100; draw(); },
   });
 
+  let intensityForBrief = () => intensity;
   let photoEl = null;
   async function draw() {
     try {
@@ -313,6 +315,11 @@ function simulationBlock(look, ctx) {
       intensityRange,
     ),
     el('p', { class: 'micro muted', style: { margin: 0 }, text: t('sim_disclaimer') }),
+    el('button', {
+      class: 'btn btn-ghost btn-block btn-sm',
+      html: icon('sparkles') + `<span>${esc(t('brief_open'))}</span>`,
+      onclick: () => openMakeupBrief(look, { intensity: intensityForBrief() }),
+    }),
   );
 }
 

@@ -16,6 +16,13 @@ export const el = (tag, attrs = {}, ...kids) => {
     else if (k === 'text') n.textContent = v;
     else if (k.startsWith('on') && typeof v === 'function') n.addEventListener(k.slice(2).toLowerCase(), v);
     else if (k === 'style' && typeof v === 'object') Object.assign(n.style, v);
+    // A textarea has no `value` attribute — its content is its value — so
+    // setAttribute silently does nothing and the field renders empty. Set the
+    // property, and keep the attribute where one legitimately exists.
+    else if (k === 'value' && 'value' in n) {
+      n.value = v;
+      if (n.tagName === 'INPUT' || n.tagName === 'OPTION') n.setAttribute('value', v);
+    }
     else n.setAttribute(k, v);
   }
   kids.flat().forEach(c => c != null && n.append(c.nodeType ? c : document.createTextNode(c)));

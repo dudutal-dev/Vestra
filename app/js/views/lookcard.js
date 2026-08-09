@@ -7,6 +7,7 @@ import { el, icon, esc } from '../ui.js';
 import { t, pick, isHe } from '../i18n.js';
 import { slotName, catIcon, hexFor } from '../taxonomy.js';
 import { itemById } from '../state.js';
+import { openTryOnBrief } from './brief.js';
 
 const noteBlock = (label, body) => body
   ? el('div', { class: 'look-note' },
@@ -95,6 +96,11 @@ export function renderLookCard(look, { onSave, onBeauty, saved } = {}) {
         onclick: () => onBeauty(look),
       }) : null,
     ),
+    el('button', {
+      class: 'btn btn-sm btn-quiet btn-block',
+      html: icon('sparkles') + `<span>${esc(t('brief_open'))}</span>`,
+      onclick: () => openTryOnBrief(look),
+    }),
   );
 }
 

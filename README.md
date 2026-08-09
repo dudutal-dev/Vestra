@@ -72,6 +72,13 @@ It holds the same seven gates, and reads your profile the same way. Your **cover
 ### 📸 Batch cataloging
 Select ten garment photos at once and they catalog in sequence with a progress readout — the fastest way to get a wardrobe in.
 
+### 🎬 A brief for a full render
+The simulations on the look card and in the beauty view are drawn on canvas — instant, free, and offline, but a drawing. When you want a photograph, **Render brief** writes the instruction an image model needs and hands you the photos it refers to.
+
+The brief names each product by where it sits rather than what it is called, carries every shade as a hex, and lets the face analysis shape it — hooded lids get the shadow placed above the crease, a warm undertone is told not to correct itself away. For an outfit it lists colour, fabric, cut and placement per piece, and attaches your actual garment photographs, because a model that can see the garment reproduces it while one reading a description invents something similar. Its longest paragraph is the one about what must *not* change: same face, same pose, same lighting, same background, skin texture intact, nothing smoothed or slimmed.
+
+Copy it, attach the photos, and run it wherever you already have an image model — a Claude conversation with an image connector, for instance. VESTRA is a static site with no server, so it writes the brief rather than running the render; nothing leaves your device until you attach it yourself.
+
 ### 🧪 A sample wardrobe to try it against
 **Profile → Load sample wardrobe** drops in a 25-piece capsule spanning formality 2 to 6, so the Studio can close a look and the health report has something to count before you have photographed anything of your own. The garments are drawn by the app rather than shipped as files — laid flat on a plain ground, which is the same shot the guide asks you for and the same one the try-on's cutout expects. One tap removes them again, and nothing you added yourself is touched.
 
