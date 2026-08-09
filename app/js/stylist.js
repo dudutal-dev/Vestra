@@ -61,6 +61,18 @@ function hexToHsl(hex) {
   return out;
 }
 
+const rgbOf = (hex) => {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+  return m ? [1, 2, 3].map(i => parseInt(m[i], 16)) : null;
+};
+
+/** Straight RGB distance — enough to tell "two blacks" from "black and navy". */
+function hexDistance(a, b) {
+  const x = rgbOf(a), y = rgbOf(b);
+  if (!x || !y) return a === b ? 0 : 999;
+  return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+}
+
 const hueDist = (a, b) => {
   const d = Math.abs(a - b);
   return d > 180 ? 360 - d : d;
@@ -486,17 +498,18 @@ export function buildLookLocal({ wardrobe, profile, request, anchor = null }) {
   add(pickBest(poolFor('accessory'), ctx(), { optional: true }), 'accessory');
   if (target >= 4) add(pickBest(poolFor('jewelry'), ctx(), { optional: true }), 'jewelry');
 
-  /* --- Palette --- */
+  /* --- Palette ---
+     Deduped by eye rather than by string: an all-black outfit whose pieces are
+     catalogued as #1A1A1C and #17171A is one colour, and showing it as four
+     swatches reads as a rendering fault rather than as a colour story. --- */
   const palette = [];
-  const seen = new Set();
   for (const c of chosen) {
+    if (palette.length >= 4) break;
     const hex = hexFor(c.color_primary);
-    if (!seen.has(hex) && palette.length < 4) {
-      seen.add(hex);
-      palette.push({
-        name_he: c.color_primary?.name_he || '', name_en: c.color_primary?.name_en || '', hex,
-      });
-    }
+    if (palette.some(p => hexDistance(p.hex, hex) < 30)) continue;
+    palette.push({
+      name_he: c.color_primary?.name_he || '', name_en: c.color_primary?.name_en || '', hex,
+    });
   }
 
   /* --- Gaps: every slot the engine wanted and the closet couldn't fill.

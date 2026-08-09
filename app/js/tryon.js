@@ -16,6 +16,7 @@
    ============================================================ */
 
 import { loadImage } from './makeup.js';
+import { catName, subName } from './taxonomy.js';
 
 /* ---------------- geometry ---------------- */
 const px = (box, w, h) => ({
@@ -334,124 +335,331 @@ export async function renderTryOn(canvas, bodyPhoto, regions, items, opts = {}) 
 
 /* ============================================================
    Lookbook — a shareable card, generated at print-ish resolution
+
+   The card is laid out like a magazine page rather than a screenshot: one
+   margin that everything hangs off, the wordmark with its own V overprinted
+   in oxblood, a hairline rule carrying a short gold tick, the occasion as the
+   headline, and the pieces as framed plates. The palette and the styling note
+   are anchored to the bottom, so a look with three pieces and a look with
+   eight both land on the same grid instead of drifting.
+
+   Garment plates use the same cutout the try-on uses — a piece floating on
+   white reads as a lookbook, the original photograph with its background
+   still attached reads as a camera roll.
    ============================================================ */
 
-const CLOUD = '#FBFAF7', INK = '#14110F', LINE = '#E3DDD2', MUTED = '#7A716A';
+const CLOUD = '#FBFAF7', PAPER = '#F3EEE6';
+const INK = '#14110F', MUTED = '#7A716A', LINE = '#DFD8CC';
+const OXBLOOD = '#5C1A22', GOLD = '#C7A96B';
+
+const SERIF_LTR = '"Playfair Display", Georgia, "Times New Roman", serif';
+const SERIF_RTL = '"Frank Ruhl Libre", "Playfair Display", Georgia, serif';
+const SANS = 'Inter, Assistant, "Helvetica Neue", Arial, sans-serif';
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
+
+const HEBREW = /[\u0590-\u05FF]/;
+
+/* The card is drawn once, at export time, so the webfonts have to be resident
+   before the first fillText — otherwise the PNG ships with Georgia in it while
+   the page itself shows Playfair. */
+async function lookbookFonts() {
+  if (!document.fonts?.load) return;
+  const faces = [
+    '600 94px "Playfair Display"', '500 58px "Playfair Display"', '400 25px "Playfair Display"',
+    '500 58px "Frank Ruhl Libre"', '400 25px "Frank Ruhl Libre"',
+    '600 17px Inter', '400 25px Inter',
+  ];
+  try { await Promise.all(faces.map(f => document.fonts.load(f))); } catch { /* fall back to the stack */ }
+}
 
 export async function renderLookbook({
-  bodyPhoto = null, items = [], palette = [], title = 'VESTRA', subtitle = '', note = '', rtl = false,
+  bodyPhoto = null, items = [], palette = [], headline = '', meta = [], note = '', rtl = false,
 }) {
-  const W = 1080, H = 1350;
+  await lookbookFonts();
+
+  const W = 1080, H = 1350, M = 96;
+  const inner = W - M * 2;
+  const serif = rtl ? SERIF_RTL : SERIF_LTR;
+  const near = rtl ? W - M : M;                 // the reading edge
+  const far = rtl ? M : W - M;
+
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
-  const ctx = c.getContext('2d');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
   ctx.direction = rtl ? 'rtl' : 'ltr';
-  ctx.textAlign = rtl ? 'right' : 'left';
-  const tx = rtl ? W - 72 : 72;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
 
-  // background
-  const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, CLOUD);
-  bg.addColorStop(0.55, '#F2ECE2');
-  bg.addColorStop(1, '#E8DFD2');
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
+  ground(ctx, W, H, rtl);
 
-  // header
-  ctx.fillStyle = INK;
-  ctx.font = '600 46px Georgia, "Playfair Display", serif';
-  ctx.fillText('VESTRA', tx, 92);
-  ctx.fillStyle = MUTED;
-  ctx.font = '500 21px Inter, Assistant, sans-serif';
-  ctx.fillText(subtitle || 'Your AI Atelier', tx, 126);
+  /* ---- masthead ---- */
+  const markFont = '600 94px ' + SERIF_LTR;     // the wordmark is Latin in both languages
+  const markW = span(ctx, 'VESTRA', markFont, 2);
+  const markLeft = rtl ? near - markW : near;
+  line(ctx, 'VESTRA', { x: markLeft, y: 88, font: markFont, color: INK, track: 2 });
+  line(ctx, 'V', { x: markLeft, y: 88, font: markFont, color: OXBLOOD });
+  line(ctx, rtl ? 'ארון · סטייל · אופנה' : 'WARDROBE · STYLE · FASHION',
+    { x: near, y: 118, font: '600 17px ' + SANS, color: MUTED, track: 7, anchor: 'start', rtl });
 
-  ctx.strokeStyle = LINE;
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(72, 158); ctx.lineTo(W - 72, 158); ctx.stroke();
+  rule(ctx, M, W - M, 140, LINE, 2);
+  rule(ctx, near, rtl ? near - 120 : near + 120, 140, GOLD, 3);
 
-  // title
-  ctx.fillStyle = INK;
-  ctx.font = '500 54px Georgia, "Frank Ruhl Libre", serif';
-  ctx.fillText(clip(ctx, title, W - 160), tx, 232);
+  /* ---- the occasion, as the headline ---- */
+  line(ctx, headline, { x: near, y: 222, font: '500 58px ' + serif, color: INK, anchor: 'start', rtl, maxW: inner });
+  if (meta.length) {
+    line(ctx, meta.join('  ·  '), { x: near, y: 262, font: '400 16px ' + MONO, color: MUTED, track: 4, anchor: 'start', rtl, maxW: inner });
+  }
 
-  // body photo panel
-  const panel = { x: 72, y: 276, w: 420, h: 700 };
+  /* ---- the plates ---- */
+  const top = 322, bottom = 942;
+  const shown = items.slice(0, bodyPhoto ? 4 : 8);
+
   if (bodyPhoto) {
-    ctx.save();
-    roundRect(ctx, panel.x, panel.y, panel.w, panel.h, 26);
-    ctx.clip();
-    const iw = bodyPhoto.naturalWidth || bodyPhoto.width;
-    const ih = bodyPhoto.naturalHeight || bodyPhoto.height;
-    const s = Math.max(panel.w / iw, panel.h / ih);
-    ctx.drawImage(bodyPhoto, panel.x + (panel.w - iw * s) / 2, panel.y + (panel.h - ih * s) / 2, iw * s, ih * s);
-    ctx.restore();
-    ctx.strokeStyle = LINE;
-    roundRect(ctx, panel.x, panel.y, panel.w, panel.h, 26);
-    ctx.stroke();
-  }
+    const pw = 400, gap = 24;
+    const px0 = rtl ? W - M - pw : M;
+    plate(ctx, px0, top, pw, bottom - top, () => cover(ctx, bodyPhoto, px0, top, pw, bottom - top));
 
-  // item grid on the other side
-  const gridX = bodyPhoto ? 532 : 72;
-  const gridW = W - gridX - 72;
-  const cols = 2;
-  const cell = Math.floor((gridW - 20) / cols);
-  const cellH = Math.round(cell * 1.28);
-
-  for (const [i, item] of items.slice(0, bodyPhoto ? 4 : 8).entries()) {
-    const cx = gridX + (i % cols) * (cell + 20);
-    const cy = 276 + Math.floor(i / cols) * (cellH + 20);
-    ctx.save();
-    roundRect(ctx, cx, cy, cell, cellH, 18);
-    ctx.fillStyle = '#fff';
-    ctx.fill();
-    ctx.clip();
-    if (item.thumb) {
-      try {
-        const img = await loadImage(item.thumb);
-        const iw = img.naturalWidth, ih = img.naturalHeight;
-        const s = Math.max(cell / iw, cellH / ih);
-        ctx.drawImage(img, cx + (cell - iw * s) / 2, cy + (cellH - ih * s) / 2, iw * s, ih * s);
-      } catch { /* fall through to the empty card */ }
+    const gw = inner - pw - gap;
+    const gx0 = rtl ? M : M + pw + gap;
+    const cellW = (gw - 20) / 2, cellH = (bottom - top - 20) / 2;
+    for (const [i, item] of shown.entries()) {
+      const col = i % 2, row = (i / 2) | 0;
+      const x = gx0 + (rtl ? 1 - col : col) * (cellW + 20);
+      await garmentPlate(ctx, item, x, top + row * (cellH + 20), cellW, cellH, rtl);
     }
-    ctx.restore();
-    ctx.strokeStyle = LINE;
-    roundRect(ctx, cx, cy, cell, cellH, 18);
-    ctx.stroke();
+  } else {
+    // No body photo: the plates are the whole picture, so size them to the count.
+    const cols = shown.length <= 3 ? Math.max(1, shown.length) : 4;
+    const rows = Math.ceil(shown.length / cols) || 1;
+    const gap = 22;
+    const cellW = (inner - gap * (cols - 1)) / cols;
+    const cellH = Math.min((bottom - top - gap * (rows - 1)) / rows, cellW * 1.42);
+    // The row hangs from the top of the band, so a three-piece look spends its
+    // spare height as one open field rather than two half-gaps.
+    const y0 = top;
+    for (const [i, item] of shown.entries()) {
+      const col = i % cols, row = (i / cols) | 0;
+      const x = M + (rtl ? cols - 1 - col : col) * (cellW + gap);
+      await garmentPlate(ctx, item, x, y0 + row * (cellH + gap), cellW, cellH, rtl);
+    }
   }
 
-  // palette
-  let py = 1040;
+  /* ---- palette ---- */
   if (palette.length) {
+    line(ctx, rtl ? 'פלטה' : 'PALETTE', { x: near, y: 1012, font: '600 16px ' + SANS, color: MUTED, track: 6, anchor: 'start', rtl });
+    const r = 25, step = r * 2 + 17;
     palette.slice(0, 6).forEach((p, i) => {
-      const sx = rtl ? W - 72 - 56 - i * 68 : 72 + i * 68;
-      ctx.fillStyle = p.hex || '#ccc';
+      const cx = rtl ? near - r - i * step : near + r + i * step;
       ctx.beginPath();
-      ctx.arc(sx + 28, py + 28, 28, 0, Math.PI * 2);
+      ctx.arc(cx, 1050, r, 0, Math.PI * 2);
+      ctx.fillStyle = p.hex || '#ccc';
       ctx.fill();
       ctx.strokeStyle = LINE;
+      ctx.lineWidth = 1.5;
       ctx.stroke();
     });
-    py += 92;
   }
 
-  // note
+  /* ---- the styling note ---- */
   if (note) {
-    ctx.fillStyle = MUTED;
-    ctx.font = '400 23px Inter, Assistant, sans-serif';
-    wrap(ctx, note, tx, py + 8, W - 160, 32, 3);
+    rule(ctx, M, W - M, 1092, LINE, 1);
+    line(ctx, rtl ? 'למה זה עובד' : 'WHY IT WORKS',
+      { x: near, y: 1126, font: '600 16px ' + SANS, color: OXBLOOD, track: 6, anchor: 'start', rtl });
+    block(ctx, note, { x: near, y: 1168, font: '400 24px ' + serif, color: INK, maxW: inner, lh: 37, lines: 3, rtl });
   }
 
-  // footer rule
-  ctx.strokeStyle = LINE;
-  ctx.beginPath(); ctx.moveTo(72, H - 74); ctx.lineTo(W - 72, H - 74); ctx.stroke();
-  ctx.fillStyle = MUTED;
-  ctx.font = '600 19px Inter, Assistant, sans-serif';
-  ctx.fillText('vestra · ' + new Date().toLocaleDateString(rtl ? 'he-IL' : 'en-GB'), tx, H - 38);
+  /* ---- footer ---- */
+  rule(ctx, M, W - M, 1286, LINE, 1);
+  line(ctx, rtl ? 'נבנה מהארון שלך' : 'BUILT FROM YOUR OWN WARDROBE',
+    { x: near, y: 1320, font: '600 16px ' + SANS, color: MUTED, track: 5, anchor: 'start', rtl });
+  line(ctx, 'vestra', { x: far, y: 1320, font: '400 24px ' + SERIF_LTR, color: INK, anchor: 'end', rtl });
 
+  grain(ctx, W, H);
   return c;
 }
 
-/* ---------------- canvas text helpers ---------------- */
+/* ---------------- lookbook parts ---------------- */
+
+/** Warm paper, lit from the masthead corner — which swaps sides with the script. */
+function ground(ctx, W, H, rtl) {
+  const litX = rtl ? W * 0.82 : W * 0.18;
+  const shadeX = W - litX;
+
+  const g = ctx.createLinearGradient(rtl ? W : 0, 0, rtl ? W * 0.65 : W * 0.35, H);
+  g.addColorStop(0, CLOUD);
+  g.addColorStop(0.62, '#F7F3EC');
+  g.addColorStop(1, PAPER);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  const lit = ctx.createRadialGradient(litX, H * 0.10, 0, litX, H * 0.10, W * 0.62);
+  lit.addColorStop(0, 'rgba(255,255,255,0.55)');
+  lit.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = lit;
+  ctx.fillRect(0, 0, W, H);
+
+  const shade = ctx.createRadialGradient(shadeX, H * 0.97, 0, shadeX, H * 0.97, W * 0.55);
+  shade.addColorStop(0, 'rgba(233,224,211,0.55)');
+  shade.addColorStop(1, 'rgba(233,224,211,0)');
+  ctx.fillStyle = shade;
+  ctx.fillRect(0, 0, W, H);
+}
+
+/** A white card with a hairline edge; `paint` runs clipped to it. */
+function plate(ctx, x, y, w, h, paint) {
+  ctx.save();
+  roundRect(ctx, x, y, w, h, 14);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.clip();
+  paint();
+  ctx.restore();
+  ctx.strokeStyle = LINE;
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, x, y, w, h, 14);
+  ctx.stroke();
+}
+
+/**
+ * One garment, framed.
+ *
+ * The piece sits on a warm inner panel rather than straight on the white card:
+ * an ivory shirt cut out onto white leaves nothing to look at, and a photo
+ * whose own background survived the cut needs its rectangle to look intended.
+ * One panel solves both.
+ */
+async function garmentPlate(ctx, item, x, y, w, h, rtl) {
+  const padX = w * 0.09, padTop = h * 0.06, padBottom = h * 0.20;
+  let img = null;
+  if (item?.thumb) { try { img = await loadImage(item.thumb); } catch { img = null; } }
+
+  plate(ctx, x, y, w, h, () => {
+    const bx = x + padX, by = y + padTop, bw = w - padX * 2, bh = h - padTop - padBottom;
+    ctx.save();
+    roundRect(ctx, bx, by, bw, bh, 8);
+    ctx.fillStyle = '#F4F0E8';
+    ctx.fill();
+    ctx.clip();
+    if (img) {
+      const cut = cutoutFor(img);
+      if (cut) contain(ctx, cut, bx + bw * 0.06, by + bh * 0.06, bw * 0.88, bh * 0.88);
+      else cover(ctx, img, bx, by, bw, bh);
+    }
+    ctx.restore();
+  });
+
+  // The subcategory says more than the category — "silk shirt", not "tops".
+  const label = String(item ? (subName(item.subcategory) || catName(item.category)) : '').replace(/-/g, ' ');
+  if (label) {
+    const he = HEBREW.test(label);
+    line(ctx, he ? label : label.toUpperCase(), {
+      x: x + w / 2, y: y + h - padBottom * 0.42, font: '600 14px ' + SANS,
+      color: MUTED, track: he ? 0 : 4, anchor: 'center', rtl, maxW: w - 16,
+    });
+  }
+}
+
+function cover(ctx, img, x, y, w, h) {
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  if (!iw || !ih) return;
+  const s = Math.max(w / iw, h / ih);
+  ctx.drawImage(img, x + (w - iw * s) / 2, y + (h - ih * s) / 2, iw * s, ih * s);
+}
+
+function contain(ctx, img, x, y, w, h) {
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  if (!iw || !ih) return;
+  const s = Math.min(w / iw, h / ih);
+  ctx.drawImage(img, x + (w - iw * s) / 2, y + (h - ih * s) / 2, iw * s, ih * s);
+}
+
+function rule(ctx, x0, x1, y, color, width) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(Math.min(x0, x1), y);
+  ctx.lineTo(Math.max(x0, x1), y);
+  ctx.stroke();
+}
+
+/**
+ * Paper is never perfectly flat, and a canvas gradient is. A few levels of
+ * noise keep the wide fields from banding on a phone screen.
+ */
+function grain(ctx, W, H, amount = 3) {
+  let image;
+  try { image = ctx.getImageData(0, 0, W, H); } catch { return; }
+  const d = image.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (Math.random() - 0.5) * amount * 2;
+    d[i] += n; d[i + 1] += n; d[i + 2] += n;
+  }
+  ctx.putImageData(image, 0, 0);
+}
+
+/* ---------------- canvas typography ---------------- */
+
+/** Width of a run, including the gaps that tracking adds between letters. */
+function span(ctx, text, font, track = 0) {
+  ctx.font = font;
+  return ctx.measureText(text).width + track * Math.max(0, text.length - 1);
+}
+
+/**
+ * One line of type.
+ *
+ * `x` is an edge, and `anchor` says which one in reading terms: 'start' is the
+ * left in English and the right in Hebrew, so a single layout serves both.
+ * Tracking is drawn letter by letter because `ctx.letterSpacing` still isn't
+ * everywhere — and it is dropped for Hebrew, where spacing the letters out
+ * only makes the word harder to read.
+ */
+function line(ctx, text, { x, y, font, color, track = 0, anchor = 'start', rtl = false, maxW = 0 }) {
+  let s = String(text ?? '');
+  if (!s) return;
+  ctx.font = font;
+  ctx.fillStyle = color;
+  const sp = HEBREW.test(s) ? 0 : track;
+  if (maxW) s = clip(ctx, s, maxW, sp);
+
+  const w = span(ctx, s, font, sp);
+  let left;
+  if (anchor === 'center') left = x - w / 2;
+  else if ((anchor === 'start') === !rtl) left = x;
+  else left = x - w;
+
+  if (!sp) { ctx.fillText(s, left, y); return; }
+  let cx = left;
+  for (const ch of s) {
+    ctx.fillText(ch, cx, y);
+    cx += ctx.measureText(ch).width + sp;
+  }
+}
+
+/** Wrapped type, same edge rules as `line`. Overflow is trimmed with an ellipsis. */
+function block(ctx, text, { x, y, font, color, maxW, lh, lines = 3, rtl = false }) {
+  ctx.font = font;
+  const words = String(text).split(/\s+/).filter(Boolean);
+  const out = [];
+  let cur = '';
+  for (const word of words) {
+    const test = cur ? cur + ' ' + word : word;
+    if (cur && ctx.measureText(test).width > maxW) {
+      out.push(cur);
+      cur = word;
+      if (out.length === lines) break;
+    } else {
+      cur = test;
+    }
+  }
+  if (out.length < lines && cur) out.push(cur);
+  if (out.length === lines && cur && out[lines - 1] !== cur) {
+    out[lines - 1] = clip(ctx, out[lines - 1] + ' ' + cur, maxW, 0, '…');
+  }
+  out.forEach((l, i) => line(ctx, l, { x, y: y + i * lh, font, color, anchor: 'start', rtl }));
+}
+
+/* ---------------- canvas shape helpers ---------------- */
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -462,27 +670,13 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function clip(ctx, text, maxW) {
+/** Shorten a run until it fits `maxW` at the given tracking. */
+function clip(ctx, text, maxW, track = 0, suffix = '') {
   let s = String(text || '');
-  while (s.length > 4 && ctx.measureText(s).width > maxW) s = s.slice(0, -2);
-  return s;
-}
-
-function wrap(ctx, text, x, y, maxW, lh, maxLines) {
-  const words = String(text).split(/\s+/);
-  let line = '', lines = 0;
-  for (const word of words) {
-    const test = line ? line + ' ' + word : word;
-    if (ctx.measureText(test).width > maxW && line) {
-      ctx.fillText(line, x, y + lines * lh);
-      lines++;
-      line = word;
-      if (lines >= maxLines) return;
-    } else {
-      line = test;
-    }
-  }
-  if (line && lines < maxLines) ctx.fillText(line, x, y + lines * lh);
+  const fits = (v) => ctx.measureText(v).width + track * Math.max(0, v.length - 1) <= maxW;
+  if (fits(s + suffix)) return s + suffix;
+  while (s.length > 1 && !fits(s + suffix)) s = s.slice(0, -1);
+  return s.trimEnd() + suffix;
 }
 
 /** Trigger a browser download for a canvas. */

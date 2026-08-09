@@ -96,7 +96,7 @@
 **מה זה נותן:**
 - זיהוי מבנה גוף, יחס כתפיים-ירכיים ופרופורציות
 - 3-5 המלצות גזרה קונקרטיות
-- **תצוגת הלוק על התמונה שלכם** + ייצוא לוקבוק להורדה
+- **תצוגת הלוק על התמונה שלכם** + ייצוא לוקבוק להורדה — גיליון 1080×1350 בעיצוב מגזין, עם התמונה שלכם, הפריטים, הפלטה והנימוק, מסודר לשיתוף
 
 > 🔒 **פרטיות:** התמונות נשמרות ב-IndexedDB במכשיר בלבד. הן נשלחות ל-Anthropic **רק** ברגע שאתם לוחצים "נתח", ולא נשמרות שם. אפשר למחוק אותן בכל רגע מהפרופיל.
 
@@ -300,7 +300,7 @@ Manual cataloging works fully — a form with every field. Slower, but the styli
 **What you get:**
 - Body shape, shoulder-to-hip ratio and proportions
 - 3-5 concrete cut recommendations
-- **The outfit shown over your own photo**, plus a downloadable lookbook
+- **The outfit shown over your own photo**, plus a downloadable lookbook — an editorial 1080×1350 sheet carrying your photo, the pieces, the palette and the styling note, laid out for sharing
 
 > 🔒 **Privacy:** photos are stored in IndexedDB on your device only. They are sent to Anthropic **only** the moment you press "Analyze", and are not retained there. Delete them any time from your profile.
 

@@ -10,7 +10,7 @@ import { buildLook, pairWithItem, errText } from '../ai.js';
 import { buildLookLocal, pairWithItemLocal } from '../stylist.js';
 import { renderTryOn, renderLookbook, downloadCanvas } from '../tryon.js';
 import { loadImage } from '../makeup.js';
-import { OCCASIONS, TIMES, WEATHER, MOODS, occName, catIcon, lbl } from '../taxonomy.js';
+import { OCCASIONS, TIMES, WEATHER, MOODS, occName, catIcon, lbl, formalityName } from '../taxonomy.js';
 import { renderLookCard } from './lookcard.js';
 
 const MIN_ITEMS = 4;
@@ -183,6 +183,20 @@ function renderSingleResult(root, ctx) {
 /* ============================================================
    Try-on — places the outfit over the owner's own body photo
    ============================================================ */
+/**
+ * The credit line under the lookbook headline: body shape, formality, weather.
+ * Whatever the app doesn't actually know is left out rather than guessed at,
+ * so a short line means a short line — never a placeholder.
+ */
+function lookbookMeta(look, rec) {
+  const out = [];
+  if (rec?.body?.shape) out.push(rec.body.shape);
+  if (look?.formality) out.push(formalityName(look.formality));
+  const w = WEATHER.find(x => x.key === state.request?.weather);
+  if (w) out.push(lbl(w.name).split('·')[0].trim());   // the label, without its temperature range
+  return isHe() ? out : out.map(s => s.toUpperCase());
+}
+
 export function tryOnBlock(look, ctx) {
   const rec = state.body;
   const items = (look?.items || []).map(r => itemById(r.id)).filter(Boolean);
@@ -249,14 +263,18 @@ export function tryOnBlock(look, ctx) {
         class: 'btn btn-quiet btn-sm tiny',
         html: icon('download') + `<span>${esc(t('tryon_lookbook'))}</span>`,
         onclick: async (e) => {
-          e.currentTarget.disabled = true;
+          // Hold the node: `currentTarget` is cleared once the event finishes
+          // dispatching, so re-reading it in `finally` would leave the button
+          // disabled for good after the first card.
+          const btn = e.currentTarget;
+          btn.disabled = true;
           try {
             const sheet = await renderLookbook({
               bodyPhoto: photoEl,
               items,
               palette: look.palette || [],
-              title: pick(look, 'title') || t('look_ready'),
-              subtitle: pick(look, 'occasion') || '',
+              headline: pick(look, 'occasion') || pick(look, 'title') || t('look_ready'),
+              meta: lookbookMeta(look, rec),
               note: pick(look, 'why_it_works') || '',
               rtl: isHe(),
             });
@@ -266,7 +284,7 @@ export function tryOnBlock(look, ctx) {
           } catch {
             toast(t('err_generic'), 'warn');
           } finally {
-            e.currentTarget.disabled = false;
+            btn.disabled = false;
           }
         },
       }),

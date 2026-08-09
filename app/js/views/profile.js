@@ -226,7 +226,10 @@ export function renderProfile(root, ctx) {
         html: icon(loaded ? 'trash' : 'plus') +
           `<span>${esc(loaded ? `${t('demo_remove')} (${loaded})` : `${t('demo_load')} (${DEMO_SIZE})`)}</span>`,
         onclick: async (e) => {
-          e.currentTarget.disabled = true;
+          // Hold the node: `currentTarget` is cleared once the event finishes
+          // dispatching, and everything below this line runs after that.
+          const btn = e.currentTarget;
+          btn.disabled = true;
           try {
             const n = loaded ? await removeDemoWardrobe() : await loadDemoWardrobe();
             await refreshAll();
@@ -234,7 +237,7 @@ export function renderProfile(root, ctx) {
             ctx.rerender();
           } catch {
             toast(t('err_generic'), 'bad');
-            e.currentTarget.disabled = false;
+            btn.disabled = false;
           }
         },
       }),
