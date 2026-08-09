@@ -145,317 +145,636 @@ function subjectBlob(mask, w, h) {
 
 /* ============================================================
    1 · Face
+
+   The face is located by its EYES, not by its skin.
+
+   Skin colour cannot find a face on its own. The backdrop the guide asks you
+   to shoot against — a plain wall, a sheet — is very often a warm neutral, and
+   warm neutrals sit inside the same chroma window as skin. On a beige studio
+   backdrop the skin rule accepts about seventy per cent of the frame, the
+   "largest skin region" becomes the whole photograph, and every feature
+   derived from it lands somewhere between the hair and the collarbone.
+
+   So skin is demoted to what it is actually good at — confirming a face is
+   where we think it is, and telling us its tone — and the anchor becomes the
+   pair of eyes. An eye is the one thing a wall cannot imitate: a small bright
+   patch of nearly colourless sclera with something much darker beside it.
+
+   Once two of those are paired, the rest is anthropometry. The distance
+   between the pupils sets the scale of everything else, the angle between them
+   is the head's tilt, and every region is placed in that rotated frame the way
+   a makeup artist measures a face — by proportion from the eye line.
    ============================================================ */
 
-const FACE_EDGE = 260;
+const FACE_EDGE = 480;
+
+/** Mean luminance over a square window, via an integral image. */
+function boxBlur(lum, w, h, r) {
+  const stride = w + 1;
+  const integ = new Float64Array(stride * (h + 1));
+  for (let y = 0; y < h; y++) {
+    let row = 0;
+    for (let x = 0; x < w; x++) {
+      row += lum[y * w + x];
+      integ[(y + 1) * stride + x + 1] = integ[y * stride + x + 1] + row;
+    }
+  }
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.max(0, y - r), y1 = Math.min(h - 1, y + r);
+    for (let x = 0; x < w; x++) {
+      const x0 = Math.max(0, x - r), x1 = Math.min(w - 1, x + r);
+      const s = integ[(y1 + 1) * stride + x1 + 1] - integ[y0 * stride + x1 + 1]
+              - integ[(y1 + 1) * stride + x0] + integ[y0 * stride + x0];
+      out[y * w + x] = s / ((x1 - x0 + 1) * (y1 - y0 + 1));
+    }
+  }
+  return out;
+}
+
+/* Proportions in units of the interpupillary distance D, measured down (+v)
+   from the eye line. These are the standard adult facial canons. */
+const P = {
+  faceW: 2.22,        // bizygomatic width
+  toHairline: 1.03,
+  toChin: 1.67,
+  toMouth: 1.08,
+  toNose: 0.72,
+  cheekU: 0.62, cheekV: 0.74,     // the apple of the cheek
+  boneU: 0.88, boneV: 0.40,       // the top of the cheekbone
+  jawU: 0.92, jawV: 1.08,         // the hollow beneath it
+  // Measured from the pupil, not from the eye socket: the crease sits about
+  // 10mm above the pupil and the brow about 22mm, against a 63mm pupil gap.
+  lidV: 0.16,
+  browV: 0.35,
+};
+
+/**
+ * Everything connected to the frame edge that matches its colour. Removing it
+ * first is what stops a plain backdrop from being mistaken for a face; when
+ * the border is not uniform the whole frame is kept, and the eye search simply
+ * has more ground to cover.
+ */
+export function foreground(data, w, h) {
+  const N = w * h;
+  const border = [];
+  for (let x = 0; x < w; x++) { border.push(x); border.push((h - 1) * w + x); }
+  for (let y = 1; y < h - 1; y++) { border.push(y * w); border.push(y * w + w - 1); }
+
+  const med = (vals) => { const s = Float64Array.from(vals).sort(); return s[s.length >> 1]; };
+  const br = med(border.map(i => data[i * 4]));
+  const bg = med(border.map(i => data[i * 4 + 1]));
+  const bb = med(border.map(i => data[i * 4 + 2]));
+  const TOL = 34;
+  const near = (i) => Math.abs(data[i * 4] - br) <= TOL &&
+                      Math.abs(data[i * 4 + 1] - bg) <= TOL &&
+                      Math.abs(data[i * 4 + 2] - bb) <= TOL;
+
+  const fg = new Uint8Array(N).fill(1);
+  let odd = 0;
+  for (const i of border) if (!near(i)) odd++;
+  if (odd / border.length > 0.4) return fg;      // a busy background: keep it all
+
+  const queue = new Int32Array(N);
+  let qs = 0, qe = 0;
+  for (const i of border) if (fg[i] && near(i)) { fg[i] = 0; queue[qe++] = i; }
+  while (qs < qe) {
+    const i = queue[qs++];
+    const x = i % w, y = (i / w) | 0;
+    if (x > 0     && fg[i - 1] && near(i - 1)) { fg[i - 1] = 0; queue[qe++] = i - 1; }
+    if (x < w - 1 && fg[i + 1] && near(i + 1)) { fg[i + 1] = 0; queue[qe++] = i + 1; }
+    if (y > 0     && fg[i - w] && near(i - w)) { fg[i - w] = 0; queue[qe++] = i - w; }
+    if (y < h - 1 && fg[i + w] && near(i + w)) { fg[i + w] = 0; queue[qe++] = i + w; }
+  }
+  return fg;
+}
+
+/**
+ * Candidate whites of eyes: small, bright, almost colourless, and with
+ * something much darker immediately beside them. The size ceiling is what
+ * rejects a pale wall — a wall is one enormous component, an eye white is a
+ * few dozen pixels.
+ */
+export function scleraCandidates(lum, chroma, fg, w, h) {
+  const N = w * h;
+
+  // Brightness measured against the whole frame is the wrong question — lit
+  // skin is brighter than a median that dark hair drags down, so a global
+  // threshold lights up the face and half the chest with it. What singles out
+  // an eye white is how much brighter it is than the few millimetres around it.
+  const blur = boxBlur(lum, w, h, Math.max(3, Math.round(w * 0.03)));
+
+  const mask = new Uint8Array(N);
+  for (let i = 0; i < N; i++) {
+    if (!fg[i]) continue;
+    if (chroma[i] > 30) continue;
+    if (lum[i] < blur[i] * 1.14 || lum[i] < blur[i] + 15) continue;
+    mask[i] = 1;
+  }
+
+  const MIN = Math.max(4, N * 0.00002);
+  const MAX = N * 0.0026;
+  const out = [];
+
+  for (const c of components(mask, w, h)) {
+    const n = c.members.length;
+    if (n < MIN || n > MAX) continue;
+    const bw = c.x1 - c.x0 + 1, bh = c.y1 - c.y0 + 1;
+    if (bw > w * 0.14 || bh > h * 0.10) continue;
+    if (bw / bh > 7 || bh / bw > 4) continue;
+
+    let sum = 0;
+    for (const i of c.members) sum += lum[i];
+    const own = sum / n;
+
+    // Something dark must sit right next to it — the iris, or the lash line.
+    let darkest = 255;
+    const pad = Math.max(2, Math.round(bw * 0.9));
+    for (let y = c.y0 - pad; y <= c.y1 + pad; y++) {
+      for (let x = c.x0 - pad; x <= c.x1 + pad; x++) {
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        const i = y * w + x;
+        if (mask[i]) continue;
+        if (lum[i] < darkest) darkest = lum[i];
+      }
+    }
+    if (darkest > own * 0.66) continue;
+
+    out.push({
+      cx: (c.x0 + c.x1) / 2, cy: (c.y0 + c.y1) / 2,
+      n, lum: own, w: bw, h: bh,
+    });
+  }
+  return out;
+}
+
+/**
+ * Move each candidate from the white of the eye onto the pupil.
+ *
+ * Sclera shows either side of an iris, never over it, so a patch's centroid
+ * always sits off to one side — and if both eyes are measured from their outer
+ * whites, the distance between them comes out too wide and every proportion
+ * derived from it inflates with it. The darkest point nearby is the pupil.
+ * Snapping there also collapses the two whites of one eye onto one point, so
+ * they stop looking like two eyes.
+ */
+export function snapToPupil(cands, lum, fg, w, h) {
+  return cands.map(k => {
+    const r = clamp(Math.round(2.4 * Math.sqrt(k.n)), 3, Math.round(w * 0.035));
+    let bx = k.cx, by = k.cy, bv = Infinity;
+    for (let y = Math.round(k.cy - r); y <= k.cy + r; y++) {
+      for (let x = Math.round(k.cx - r); x <= k.cx + r; x++) {
+        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+        if (!fg[y * w + x]) continue;
+        if ((x - k.cx) ** 2 + (y - k.cy) ** 2 > r * r) continue;
+        let s = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) s += lum[(y + dy) * w + x + dx];
+        if (s < bv) { bv = s; bx = x; by = y; }
+      }
+    }
+    return { ...k, cx: bx, cy: by };
+  });
+}
+
+/** Two sclera patches either side of one iris are one eye, not two. */
+export function mergeNear(cands, radius) {
+  const used = new Array(cands.length).fill(false);
+  const out = [];
+  for (let i = 0; i < cands.length; i++) {
+    if (used[i]) continue;
+    let { cx, cy, n, lum } = cands[i];
+    used[i] = true;
+    for (let j = i + 1; j < cands.length; j++) {
+      if (used[j]) continue;
+      if (Math.hypot(cands[j].cx - cx, cands[j].cy - cy) > radius) continue;
+      const tot = n + cands[j].n;
+      cx = (cx * n + cands[j].cx * cands[j].n) / tot;
+      cy = (cy * n + cands[j].cy * cands[j].n) / tot;
+      lum = (lum * n + cands[j].lum * cands[j].n) / tot;
+      n = tot;
+      used[j] = true;
+    }
+    out.push({ cx, cy, n, lum });
+  }
+  return out;
+}
+
+/**
+ * Pick the pair that actually looks like a pair of eyes.
+ *
+ * A photograph of a person contains dozens of small bright specks — highlights
+ * on hair, a necklace, polka dots, the shine on a cheekbone. Any two of them
+ * form a plausible-looking pair, and no property of the two points alone tells
+ * them apart from eyes: not their size, not their spacing, not how much skin
+ * lies between them.
+ *
+ * What tells them apart is the face they imply. Two eyes predict where a mouth
+ * and a pair of brows must be, and those predictions are testable: the mouth
+ * is redder than the cheeks beside it, and the brows are darker than the
+ * forehead above them. Two highlights in someone's hair predict a mouth in the
+ * middle of their neck, and there is nothing red there.
+ *
+ * So each pair is scored on whether the face it implies actually exists.
+ */
+export function pickEyePair(cands, ctx) {
+  const { lum, red, skin, fg, w, h } = ctx;
+  const px = (x, y) => clamp(Math.round(y), 0, h - 1) * w + clamp(Math.round(x), 0, w - 1);
+  let best = null;
+
+  for (let i = 0; i < cands.length; i++) {
+    for (let j = i + 1; j < cands.length; j++) {
+      const a = cands[i].cx <= cands[j].cx ? cands[i] : cands[j];
+      const b = cands[i].cx <= cands[j].cx ? cands[j] : cands[i];
+      const dx = b.cx - a.cx, dy = b.cy - a.cy;
+      if (dx < w * 0.035) continue;                        // the same eye twice
+      const D = Math.hypot(dx, dy);
+      if (D > w * 0.45) continue;
+      if (Math.abs(dy) > dx * 0.5) continue;               // tilt beyond ~27°
+
+      const sizeRatio = Math.max(a.n, b.n) / Math.max(1, Math.min(a.n, b.n));
+      if (sizeRatio > 4.5) continue;
+
+      const faceW = P.faceW * D;
+      if (faceW < w * 0.16 || faceW > w * 1.05) continue;   // not a face at this scale
+
+      const mx = (a.cx + b.cx) / 2, my = (a.cy + b.cy) / 2;
+      const ux = dx / D, uy = dy / D;
+      const vx = -uy, vy = ux;                              // down the face
+      const at = (u, v) => [mx + ux * u * D + vx * v * D, my + uy * u * D + vy * v * D];
+
+      /* --- Is there a face here at all? The cheap structural tests first. --- */
+      const patch = (arr, u, v, rad = 0.16) => {
+        let s = 0, n = 0;
+        for (let dv = -rad; dv <= rad; dv += rad) {
+          for (let du = -rad; du <= rad; du += rad) {
+            const [x, y] = at(u + du, v + dv);
+            if (x < 0 || y < 0 || x >= w || y >= h) return null;
+            s += arr[px(x, y)]; n++;
+          }
+        }
+        return n ? s / n : null;
+      };
+
+      const cheekRed = patch(red, -P.cheekU, P.cheekV, 0.2);
+      const cheekRed2 = patch(red, P.cheekU, P.cheekV, 0.2);
+      if (cheekRed === null || cheekRed2 === null) continue;
+      const cheekR = (cheekRed + cheekRed2) / 2;
+
+      // The mouth: the reddest band where a mouth would have to be.
+      let mouthR = -Infinity;
+      for (let v = P.toMouth - 0.28; v <= P.toMouth + 0.28; v += 0.09) {
+        for (let u = -0.24; u <= 0.24; u += 0.12) {
+          const r = patch(red, u, v, 0.14);
+          if (r !== null && r > mouthR) mouthR = r;
+        }
+      }
+      if (!isFinite(mouthR) || mouthR - cheekR < 1.1) continue;
+
+      // The brows: darker than the forehead above them.
+      const foreheadL = patch(lum, 0, -P.toHairline * 0.55, 0.2);
+      const browL = patch(lum, -0.5, -P.browV, 0.16);
+      const browR = patch(lum, 0.5, -P.browV, 0.16);
+      if (foreheadL === null || browL === null || browR === null) continue;
+      const browDrop = foreheadL - Math.min(browL, browR);
+      if (browDrop < 5) continue;
+
+      /* --- Then the expensive one: is the implied face mostly skin? --- */
+      const faceH = (P.toHairline + P.toChin) * D;
+      const ccx = mx + vx * ((P.toChin - P.toHairline) / 2) * D;
+      const ccy = my + vy * ((P.toChin - P.toHairline) / 2) * D;
+
+      let inside = 0, isSkinCount = 0, outOfFrame = 0;
+      const step = Math.max(1, Math.round(D / 12));
+      for (let y = Math.round(ccy - faceH / 2); y <= ccy + faceH / 2; y += step) {
+        for (let x = Math.round(ccx - faceW / 2); x <= ccx + faceW / 2; x += step) {
+          const du = (x - ccx) * ux + (y - ccy) * uy;
+          const dv = (x - ccx) * vx + (y - ccy) * vy;
+          if ((du / (faceW / 2)) ** 2 + (dv / (faceH / 2)) ** 2 > 1) continue;
+          inside++;
+          if (x < 0 || y < 0 || x >= w || y >= h) { outOfFrame++; continue; }
+          const k = y * w + x;
+          if (skin[k] && fg[k]) isSkinCount++;
+        }
+      }
+      if (inside < 40) continue;
+      if (outOfFrame / inside > 0.22) continue;             // a face mostly off-frame
+      const skinFrac = isSkinCount / inside;
+      if (skinFrac < 0.60) continue;
+
+      /* --- And the test a wrong pair cannot pass: symmetry. -----------------
+         Pair one real eye with a highlight beside the nose and you still get a
+         box full of skin with a mouth under it — the region simply sits at an
+         angle, off to one side. But a face is symmetric about its own midline
+         and a misplaced frame is not, so mirroring the frame across that line
+         and comparing is what separates them. A turned head costs a little
+         symmetry; a frame anchored on the wrong point loses far more. */
+      let symDiff = 0, symN = 0;
+      for (let v = -0.7; v <= 1.45; v += 0.15) {
+        for (let u = 0.2; u <= 0.95; u += 0.15) {
+          const [xa, ya] = at(u, v), [xb, yb] = at(-u, v);
+          if (xa < 0 || ya < 0 || xa >= w || ya >= h) continue;
+          if (xb < 0 || yb < 0 || xb >= w || yb >= h) continue;
+          symDiff += Math.abs(lum[px(xa, ya)] - lum[px(xb, yb)]);
+          symN++;
+        }
+      }
+      if (symN < 20) continue;
+      const symmetry = 1 - clamp((symDiff / symN) / 55, 0, 1);
+      if (symmetry < 0.25) continue;
+
+      const level = 1 - Math.abs(dy) / Math.max(dx, 1);
+      const score = skinFrac * 1.6
+                  + symmetry * 2.6
+                  + clamp((mouthR - cheekR) / 6, 0, 1.4) * 1.8
+                  + clamp(browDrop / 45, 0, 1.2) * 1.2
+                  + level * 0.6
+                  - (sizeRatio - 1) * 0.10;
+
+      if (!best || score > best.score) {
+        best = {
+          a, b, D, mx, my, ux, uy, vx, vy, ccx, ccy, faceW, faceH,
+          skinFrac, symmetry, mouthLift: mouthR - cheekR, browDrop, score,
+        };
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Build the whole region map from three points: the two pupils and the centre
+ * of the mouth.
+ *
+ * Those three are all the geometry a face map needs — the pupils set the
+ * scale and the tilt, the mouth sets how far the head is turned — and every
+ * other region follows from them by proportion. Keeping this separate from the
+ * detector means the same map can be rebuilt from points a person placed by
+ * hand, which is the only way to be certain it is right.
+ *
+ * @param anchors {eyeL,eyeR,mouth} in normalized image coordinates, plus
+ *                optional lipHalfW / lipHalfH in units of the pupil distance.
+ * @param w,h     the image's pixel dimensions, so angles come out true.
+ */
+export function regionsFromAnchors(anchors, w, h) {
+  let eL = [anchors.eyeL.x * w, anchors.eyeL.y * h];
+  let eR = [anchors.eyeR.x * w, anchors.eyeR.y * h];
+  if (eR[0] < eL[0]) { const t = eL; eL = eR; eR = t; }
+
+  const dx = eR[0] - eL[0], dy = eR[1] - eL[1];
+  const D = Math.max(Math.hypot(dx, dy), 2);
+  const ux = dx / D, uy = dy / D;
+  const vx = -uy, vy = ux;                              // down the face
+  const mx = (eL[0] + eR[0]) / 2, my = (eL[1] + eR[1]) / 2;
+  const rollDeg = (Math.atan2(uy, ux) * 180) / Math.PI;
+  const at = (u, v) => [mx + ux * u * D + vx * v * D, my + uy * u * D + vy * v * D];
+  const off = ([x, y], u, v) => [x + ux * u * D + vx * v * D, y + uy * u * D + vy * v * D];
+
+  // Where the mouth sits in the face's own frame.
+  let mouthU = 0, mouthV = P.toMouth;
+  if (anchors.mouth) {
+    const px = anchors.mouth.x * w - mx, py = anchors.mouth.y * h - my;
+    mouthU = (px * ux + py * uy) / D;
+    mouthV = (px * vx + py * vy) / D;
+  }
+
+  const halfW = clamp(anchors.lipHalfW ?? 0.26, 0.18, 0.42);
+  const halfH = clamp(anchors.lipHalfH ?? 0.13, 0.07, Math.min(0.17, halfW * 0.62));
+
+  /* The head's turn, read from how far the mouth sits off the eye line's
+     midpoint. It shifts the lower half of the face — but NOT the mouth, which
+     is already where it was measured. Applying it there too moved the lips by
+     the offset twice, which is why they kept landing beside the mouth rather
+     than on it. */
+  const yaw = clamp(mouthU, -0.16, 0.16);
+  const lower = (u, v) => at(u + yaw * (v / P.toMouth), v);
+
+  const nx = (v) => clamp(v / w, 0, 1);
+  const ny = (v) => clamp(v / h, 0, 1);
+  const ell = ([x, y], rxD, ryD, rot = rollDeg) => ({
+    cx: nx(x), cy: ny(y), rx: (rxD * D) / w, ry: (ryD * D) / h, rot,
+  });
+
+  const eyeHalfW = 0.24, eyeHalfH = 0.24 * 0.42;
+  const faceW = P.faceW * D;
+  const faceH = (P.toHairline + P.toChin) * D;
+  const [ccx, ccy] = at(0, (P.toChin - P.toHairline) / 2);
+
+  const regions = {
+    face: { cx: nx(ccx), cy: ny(ccy), rx: (faceW / 2) / w, ry: (faceH / 2) / h, rot: rollDeg },
+    forehead:  ell(at(0, -P.toHairline * 0.45), 0.55, 0.26),
+    nose:      ell(lower(0, P.toNose), 0.17, 0.30),
+    chin:      ell(lower(0, P.toChin * 0.92), 0.30, 0.18),
+
+    eye_left:   ell(eL, eyeHalfW, eyeHalfH),
+    eye_right:  ell(eR, eyeHalfW, eyeHalfH),
+    lid_left:   ell(off(eL, 0, -P.lidV), eyeHalfW * 1.05, eyeHalfH * 1.2),
+    lid_right:  ell(off(eR, 0, -P.lidV), eyeHalfW * 1.05, eyeHalfH * 1.2),
+    brow_left:  ell(off(eL, -0.03, -P.browV), eyeHalfW * 1.1, eyeHalfH * 0.38),
+    brow_right: ell(off(eR, 0.03, -P.browV), eyeHalfW * 1.1, eyeHalfH * 0.38),
+
+    cheek_left:  ell(lower(-P.cheekU, P.cheekV), 0.30, 0.24),
+    cheek_right: ell(lower(P.cheekU, P.cheekV), 0.30, 0.24),
+    bone_left:   ell(lower(-P.boneU, P.boneV), 0.28, 0.12, rollDeg - 10),
+    bone_right:  ell(lower(P.boneU, P.boneV), 0.28, 0.12, rollDeg + 10),
+    jaw_left:    ell(lower(-P.jawU, P.jawV), 0.18, 0.30, rollDeg - 6),
+    jaw_right:   ell(lower(P.jawU, P.jawV), 0.18, 0.30, rollDeg + 6),
+
+    lips:      ell(at(mouthU, mouthV), halfW, halfH),
+    lip_upper: ell(at(mouthU, mouthV - halfH * 0.48), halfW * 0.97, halfH * 0.5),
+    lip_lower: ell(at(mouthU, mouthV + halfH * 0.50), halfW * 0.9, halfH * 0.54),
+  };
+
+  return { regions, at, off, lower, eL, eR, frame: { D, rollDeg, mx, my, ux, uy, vx, vy } };
+}
 
 export async function analyzeFaceLocal(shot) {
   const { data, w, h } = await sample(shot.dataUrl || shot, FACE_EDGE);
   const N = w * h;
 
-  const skin = new Uint8Array(N);
   const lum = new Float32Array(N);
-  const red = new Float32Array(N);          // Cr − Cb: how much redder than neutral
-  let skinCount = 0;
+  const chroma = new Float32Array(N);
+  const red = new Float32Array(N);
+  const skin = new Uint8Array(N);
 
   for (let i = 0; i < N; i++) {
     const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
     const { y, cb, cr } = ycbcr(r, g, b);
     lum[i] = y;
+    chroma[i] = Math.abs(cb - 128) + Math.abs(cr - 128);
     red[i] = cr - cb;
-    if (isSkin(r, g, b)) { skin[i] = 1; skinCount++; }
+    if (isSkin(r, g, b)) skin[i] = 1;
   }
 
-  // A face photo that is 2% skin is not a face photo.
-  if (skinCount / N < 0.03) throw new AIError('unclear_photo');
+  const fg = foreground(data, w, h);
+  const cands = mergeNear(
+    snapToPupil(scleraCandidates(lum, chroma, fg, w, h), lum, fg, w, h),
+    w * 0.022);
+  const eyes = cands.length >= 2 ? pickEyePair(cands, { lum, red, skin, fg, w, h }) : null;
 
-  const blob = largestBlob(skin, w, h);
-  if (blob.length / N < 0.02) throw new AIError('unclear_photo');
+  // No pair of eyes, no face. Saying so beats painting a cheek onto an ear.
+  if (!eyes) throw new AIError('unclear_photo');
 
-  /* --- The face within the skin region ---------------------------------
-     The neck and chest are skin too and usually connect to the chin, so the
-     blob is wider than the face is tall. Row widths separate them: the face
-     is the broad upper mass, the neck the narrow column beneath it. */
-  const rowMin = new Int32Array(h).fill(w);
-  const rowMax = new Int32Array(h).fill(-1);
-  const rowCount = new Int32Array(h);
-  for (const i of blob) {
-    const x = i % w, y = (i / w) | 0;
-    if (x < rowMin[y]) rowMin[y] = x;
-    if (x > rowMax[y]) rowMax[y] = x;
-    rowCount[y]++;
-  }
+  const { D, mx, my, ux, uy, vx, vy, ccx, ccy, faceW, faceH } = eyes;
+  const at = (u, v) => [mx + ux * u * D + vx * v * D, my + uy * u * D + vy * v * D];
+  const rollDeg = (Math.atan2(uy, ux) * 180) / Math.PI;
 
-  let top = 0; while (top < h && !rowCount[top]) top++;
-  let bottom = h - 1; while (bottom > top && !rowCount[bottom]) bottom--;
-  if (bottom - top < 12) throw new AIError('unclear_photo');
-
-  const widths = [];
-  for (let y = top; y <= bottom; y++) widths.push(rowCount[y] ? rowMax[y] - rowMin[y] + 1 : 0);
-  const maxW = Math.max(...widths);
-
-  // Walk down from the widest row; the chin is where the face has narrowed to
-  // about a third of its widest point, or where the neck pinches in.
-  const widestRow = top + widths.indexOf(maxW);
-  let chin = bottom;
-  for (let y = widestRow; y <= bottom; y++) {
-    if (widths[y - top] < maxW * 0.36) { chin = y; break; }
-  }
-  // A neck reads as a long stretch of roughly constant, narrow width.
-  for (let y = widestRow + Math.round((bottom - widestRow) * 0.25); y <= bottom; y++) {
-    if (widths[y - top] < maxW * 0.55 && y < chin) { chin = y; break; }
-  }
-
-  const faceTop = top;
-  const faceBottom = clamp(chin, faceTop + 10, bottom);
-  const faceH = faceBottom - faceTop;
-  const faceRows = [];
-  for (let y = faceTop; y <= faceBottom; y++) if (rowCount[y]) faceRows.push(y);
-  const faceLeft = Math.min(...faceRows.map(y => rowMin[y]));
-  const faceRight = Math.max(...faceRows.map(y => rowMax[y]));
-  const faceW = faceRight - faceLeft;
-  if (faceW < 12 || faceH < 12) throw new AIError('unclear_photo');
-
-  const fcx = (faceLeft + faceRight) / 2;
-  const fcy = (faceTop + faceBottom) / 2;
-
-  /* --- Widths at three heights, which is what face shape is --- */
-  const widthAt = (frac) => {
-    const y = clamp(Math.round(faceTop + faceH * frac), 0, h - 1);
-    return rowCount[y] ? rowMax[y] - rowMin[y] + 1 : 0;
-  };
-  const foreheadW = widthAt(0.22);
-  const cheekW = widthAt(0.50);
-  const jawW = widthAt(0.82);
-
-  /* --- Eyes: dark, and not skin, in the upper-middle band --- */
-  const eyeBand = [Math.round(faceTop + faceH * 0.28), Math.round(faceTop + faceH * 0.55)];
-  const skinLum = mean(blob.map(i => lum[i]));
-  const darkThreshold = skinLum * 0.72;
-
-  const eyeCols = new Float32Array(w);
-  for (let y = eyeBand[0]; y <= eyeBand[1]; y++) {
-    for (let x = faceLeft; x <= faceRight; x++) {
-      const i = y * w + x;
-      if (!skin[i] && lum[i] < darkThreshold) eyeCols[x] += (darkThreshold - lum[i]);
-    }
-  }
-
-  const pickEye = (from, to) => {
-    let bx = -1, bv = 0;
-    for (let x = from; x <= to; x++) if (eyeCols[x] > bv) { bv = eyeCols[x]; bx = x; }
-    return bv > 0 ? bx : -1;
-  };
-  // Each eye lives in its own half — searching the whole face finds one eye twice.
-  let eyeLx = pickEye(Math.round(faceLeft + faceW * 0.10), Math.round(fcx - faceW * 0.06));
-  let eyeRx = pickEye(Math.round(fcx + faceW * 0.06), Math.round(faceRight - faceW * 0.10));
-  if (eyeLx < 0) eyeLx = Math.round(fcx - faceW * 0.21);
-  if (eyeRx < 0) eyeRx = Math.round(fcx + faceW * 0.21);
-
-  /* The brow is darker than the iris and has more of it, so darkness alone
-     finds the brow twice and never the eye. The sclera is what only an eye
-     has: bright, and almost colourless. Look for that, and fall back to the
-     lower of the two dark bands when the eyes are narrowed or the light is
-     flat. */
-  const isSclera = (i) => {
-    if (skin[i] || lum[i] < skinLum * 0.92) return false;
-    const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
-    const { cb, cr } = ycbcr(r, g, b);
-    return Math.abs(cb - 128) + Math.abs(cr - 128) < 26;
-  };
-
-  const eyeRowFor = (cx) => {
-    const x0 = Math.round(cx - faceW * 0.08), x1 = Math.round(cx + faceW * 0.08);
-    let scleraBest = eyeBand[0], scleraVal = 0;
-    const dark = [];
-
-    for (let y = eyeBand[0]; y <= eyeBand[1]; y++) {
-      let s = 0, d = 0;
-      for (let x = x0; x <= x1; x++) {
-        const i = clamp(y, 0, h - 1) * w + clamp(x, 0, w - 1);
-        if (isSclera(i)) s++;
-        if (!skin[i] && lum[i] < darkThreshold) d += (darkThreshold - lum[i]);
+  /* --- The mouth, refined by looking for it ------------------------------
+     Its predicted place is good to a few per cent; searching for the reddest
+     band nearby makes it exact, and how far it sits off the face's own axis
+     is the cheapest read there is on how far the head is turned. */
+  const skinRed = (() => {
+    let s = 0, n = 0;
+    for (const [u, v] of [[P.cheekU, P.cheekV], [-P.cheekU, P.cheekV]]) {
+      const [x, y] = at(u, v);
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const xx = clamp(Math.round(x + dx), 0, w - 1), yy = clamp(Math.round(y + dy), 0, h - 1);
+        s += red[yy * w + xx]; n++;
       }
-      if (s > scleraVal) { scleraVal = s; scleraBest = y; }
-      dark.push({ y, d });
     }
-    if (scleraVal >= 2) return scleraBest;
+    return n ? s / n : 30;
+  })();
 
-    // No usable sclera. Take the two strongest dark bands and keep the lower
-    // one — brows sit above eyes, never below.
-    const ranked = [...dark].sort((a, b) => b.d - a.d);
-    const first = ranked[0];
-    if (!first || first.d <= 0) return Math.round(faceTop + faceH * 0.42);
-    const apart = ranked.find(r => Math.abs(r.y - first.y) > faceH * 0.05 && r.d > first.d * 0.35);
-    return apart ? Math.max(first.y, apart.y) : first.y;
-  };
-  const eyeLy = eyeRowFor(eyeLx);
-  const eyeRy = eyeRowFor(eyeRx);
-  const eyeY = (eyeLy + eyeRy) / 2;
-
-  // How tall the dark run is at the eye column — the eye opening.
-  const eyeHeightAt = (cx, cy) => {
-    let n = 0;
-    for (let y = Math.round(cy - faceH * 0.09); y <= Math.round(cy + faceH * 0.09); y++) {
-      const i = clamp(y, 0, h - 1) * w + clamp(Math.round(cx), 0, w - 1);
-      if (!skin[i] && lum[i] < darkThreshold) n++;
-    }
-    return Math.max(n, 2);
-  };
-  const eyeH = (eyeHeightAt(eyeLx, eyeLy) + eyeHeightAt(eyeRx, eyeRy)) / 2;
-  const eyeW = Math.max(faceW * 0.11, 4);
-
-  /* --- Brows: the dark band above each eye --- */
-  const browRowFor = (cx, ey) => {
-    let by = Math.round(ey - faceH * 0.09), bv = -1;
-    for (let y = Math.round(ey - faceH * 0.16); y <= Math.round(ey - faceH * 0.04); y++) {
-      let v = 0;
-      for (let x = Math.round(cx - faceW * 0.08); x <= Math.round(cx + faceW * 0.08); x++) {
-        const i = clamp(y, 0, h - 1) * w + clamp(x, 0, w - 1);
-        if (lum[i] < darkThreshold) v += (darkThreshold - lum[i]);
+  /* The proportions already put the mouth within a few pixels of where it is.
+     The search is here to correct that, not to relocate it — so it looks in a
+     narrow window and pays a price for wandering off centre, which stops a
+     warm patch of cheek from winning against the actual lips. */
+  let mouthU = 0, mouthV = P.toMouth, bestRed = -Infinity;
+  for (let v = P.toMouth - 0.24; v <= P.toMouth + 0.24; v += 0.03) {
+    for (let u = -0.24; u <= 0.24; u += 0.04) {
+      let s = 0, n = 0;
+      for (let du = -0.26; du <= 0.26; du += 0.065) {
+        const [x, y] = at(u + du, v);
+        const xx = clamp(Math.round(x), 0, w - 1), yy = clamp(Math.round(y), 0, h - 1);
+        s += red[yy * w + xx] - skinRed; n++;
       }
-      if (v > bv) { bv = v; by = y; }
+      // A turned head lights one cheek more than the other, and the lit cheek
+      // is warmer than the shaded one — enough to pull an unweighted search off
+      // the mouth entirely. The penalty means only the lips can win.
+      const avg = (n ? s / n : 0) - Math.abs(u) * 16 - Math.abs(v - P.toMouth) * 6;
+      if (avg > bestRed) { bestRed = avg; mouthU = u; mouthV = v; }
     }
-    return clamp(by, faceTop + 1, ey - 2);
-  };
-  const browLy = browRowFor(eyeLx, eyeLy);
-  const browRy = browRowFor(eyeRx, eyeRy);
+  }
+  // A mouth that is barely redder than the cheek was not found; fall back to
+  // where the proportions say it is rather than to wherever the noise peaked.
+  if (bestRed < 1.2) { mouthU = 0; mouthV = P.toMouth; }
 
-  /* --- Mouth: the reddest band in the lower third --- */
-  const mouthBand = [Math.round(faceTop + faceH * 0.60), Math.round(faceTop + faceH * 0.90)];
-  const skinRed = mean(blob.map(i => red[i]));
-  let mouthY = Math.round(faceTop + faceH * 0.73), bestRed = -Infinity;
-  for (let y = mouthBand[0]; y <= mouthBand[1]; y++) {
-    let v = 0, n = 0;
-    for (let x = Math.round(fcx - faceW * 0.20); x <= Math.round(fcx + faceW * 0.20); x++) {
-      const i = clamp(y, 0, h - 1) * w + clamp(x, 0, w - 1);
-      v += red[i] - skinRed;
-      n++;
+  const mouthRedFloor = skinRed + Math.max(bestRed * 0.5, 1.2);
+  let halfW = 0.30, halfH = 0.11;
+  {
+    let uMax = 0;
+    for (let du = 0; du <= 0.62; du += 0.03) {
+      const [x1, y1] = at(mouthU + du, mouthV);
+      const [x2, y2] = at(mouthU - du, mouthV);
+      const r1 = red[clamp(Math.round(y1), 0, h - 1) * w + clamp(Math.round(x1), 0, w - 1)];
+      const r2 = red[clamp(Math.round(y2), 0, h - 1) * w + clamp(Math.round(x2), 0, w - 1)];
+      if (r1 > mouthRedFloor || r2 > mouthRedFloor) uMax = du;
     }
-    const avg = n ? v / n : 0;
-    if (avg > bestRed) { bestRed = avg; mouthY = y; }
+    let vMax = 0;
+    for (let dv = 0; dv <= 0.30; dv += 0.02) {
+      const [x1, y1] = at(mouthU, mouthV + dv);
+      const [x2, y2] = at(mouthU, mouthV - dv);
+      const r1 = red[clamp(Math.round(y1), 0, h - 1) * w + clamp(Math.round(x1), 0, w - 1)];
+      const r2 = red[clamp(Math.round(y2), 0, h - 1) * w + clamp(Math.round(x2), 0, w - 1)];
+      if (r1 > mouthRedFloor || r2 > mouthRedFloor) vMax = dv;
+    }
+    halfW = clamp(uMax || 0.26, 0.20, 0.42);
+    // A mouth is roughly twice as wide as it is tall. Left to run, the vertical
+    // scan walks off the lips into the warm skin above and below them and comes
+    // back with a circle, which then gets painted as one.
+    halfH = clamp(vMax || 0.12, 0.07, Math.min(0.17, halfW * 0.62));
   }
 
-  // Mouth width and height from the rows that stay redder than the cheeks.
-  const redderThan = skinRed + Math.max(bestRed * 0.45, 1.5);
-  let mouthLeft = fcx, mouthRight = fcx;
-  for (let x = Math.round(fcx - faceW * 0.30); x <= Math.round(fcx + faceW * 0.30); x++) {
-    const i = mouthY * w + clamp(x, 0, w - 1);
-    if (red[i] > redderThan) { mouthLeft = Math.min(mouthLeft, x); mouthRight = Math.max(mouthRight, x); }
-  }
-  let mouthTop = mouthY, mouthBottom = mouthY;
-  for (let y = mouthBand[0]; y <= mouthBand[1]; y++) {
-    let n = 0;
-    for (let x = Math.round(fcx - faceW * 0.14); x <= Math.round(fcx + faceW * 0.14); x++) {
-      if (red[clamp(y, 0, h - 1) * w + clamp(x, 0, w - 1)] > redderThan) n++;
+  const { regions, lower, off, eL, eR } = regionsFromAnchors({
+    eyeL: { x: eyes.a.cx / w, y: eyes.a.cy / h },
+    eyeR: { x: eyes.b.cx / w, y: eyes.b.cy / h },
+    mouth: { x: at(mouthU, mouthV)[0] / w, y: at(mouthU, mouthV)[1] / h },
+    lipHalfW: halfW, lipHalfH: halfH,
+  }, w, h);
+
+  /* --- The assessment, measured inside the face we just located --- */
+  const sampleSkinAt = (u, v, rad = 0.16) => {
+    const px = [];
+    for (let dv = -rad; dv <= rad; dv += rad / 2) {
+      for (let du = -rad; du <= rad; du += rad / 2) {
+        const [x, y] = lower(u + du, v + dv);
+        const xx = clamp(Math.round(x), 0, w - 1), yy = clamp(Math.round(y), 0, h - 1);
+        const i = yy * w + xx;
+        if (skin[i]) px.push(i);
+      }
     }
-    if (n > faceW * 0.10) { mouthTop = Math.min(mouthTop, y); mouthBottom = Math.max(mouthBottom, y); }
-  }
-  const mouthW = Math.max(mouthRight - mouthLeft, faceW * 0.22);
-  const mouthH = Math.max(mouthBottom - mouthTop, faceH * 0.05);
-
-  /* --- Normalise everything to the image ---------------------------------
-     Regions are ellipses in image fractions: rx of width, ry of height. */
-  const nx = (v) => clamp(v / w, 0, 1);
-  const ny = (v) => clamp(v / h, 0, 1);
-  const e = (cx, cy, rx, ry, rot = 0) => ({ cx: nx(cx), cy: ny(cy), rx: rx / w, ry: ry / h, rot });
-
-  const eyeLnx = eyeLx, eyeRnx = eyeRx;
-  const cheekY = eyeY + (mouthY - eyeY) * 0.52;
-  const boneY = eyeY + (mouthY - eyeY) * 0.26;
-  const outward = faceW * 0.30;
-
-  const regions = {
-    face:       e(fcx, fcy, faceW / 2, faceH / 2),
-    forehead:   e(fcx, faceTop + faceH * 0.16, faceW * 0.26, faceH * 0.09),
-    nose:       e(fcx, (eyeY + mouthY) / 2, faceW * 0.07, faceH * 0.11),
-    chin:       e(fcx, faceBottom - faceH * 0.06, faceW * 0.13, faceH * 0.06),
-
-    eye_left:   e(eyeLnx, eyeLy, eyeW * 0.5, eyeH * 0.5),
-    eye_right:  e(eyeRnx, eyeRy, eyeW * 0.5, eyeH * 0.5),
-    lid_left:   e(eyeLnx, eyeLy - eyeH * 0.75, eyeW * 0.55, eyeH * 0.65),
-    lid_right:  e(eyeRnx, eyeRy - eyeH * 0.75, eyeW * 0.55, eyeH * 0.65),
-    brow_left:  e(eyeLnx, browLy, eyeW * 0.62, faceH * 0.018),
-    brow_right: e(eyeRnx, browRy, eyeW * 0.62, faceH * 0.018),
-
-    cheek_left:  e(fcx - outward * 0.78, cheekY, faceW * 0.15, faceH * 0.085),
-    cheek_right: e(fcx + outward * 0.78, cheekY, faceW * 0.15, faceH * 0.085),
-    bone_left:   e(fcx - outward, boneY, faceW * 0.13, faceH * 0.045, -12),
-    bone_right:  e(fcx + outward, boneY, faceW * 0.13, faceH * 0.045, 12),
-    jaw_left:    e(fcx - faceW * 0.36, mouthY, faceW * 0.10, faceH * 0.13, -8),
-    jaw_right:   e(fcx + faceW * 0.36, mouthY, faceW * 0.10, faceH * 0.13, 8),
-
-    lips:      e((mouthLeft + mouthRight) / 2, mouthY, mouthW / 2, mouthH / 2),
-    lip_upper: e((mouthLeft + mouthRight) / 2, mouthY - mouthH * 0.26, mouthW * 0.5, mouthH * 0.26),
-    lip_lower: e((mouthLeft + mouthRight) / 2, mouthY + mouthH * 0.28, mouthW * 0.46, mouthH * 0.30),
+    return px;
   };
 
-  /* --- The assessment --- */
-  const skinPix = blob.map(i => ({ r: data[i * 4], g: data[i * 4 + 1], b: data[i * 4 + 2] }));
-  const avgR = mean(skinPix.map(p => p.r));
-  const avgG = mean(skinPix.map(p => p.g));
-  const avgB = mean(skinPix.map(p => p.b));
-  const { cb: avgCb, cr: avgCr } = ycbcr(avgR, avgG, avgB);
+  const facePix = [
+    ...sampleSkinAt(-P.cheekU, P.cheekV, 0.26),
+    ...sampleSkinAt(P.cheekU, P.cheekV, 0.26),
+    ...sampleSkinAt(0, -P.toHairline * 0.45, 0.26),
+  ];
+  const pick = (o) => (facePix.length ? mean(facePix.map(i => data[i * 4 + o])) : 128);
+  const avgR = pick(0), avgG = pick(1), avgB = pick(2);
+  const skinLum = mean(facePix.map(i => lum[i])) || 150;
 
   const depth = skinLum > 205 ? 'fair' : skinLum > 180 ? 'light' : skinLum > 150 ? 'medium' : skinLum > 118 ? 'tan' : 'deep';
 
-  /* Undertone is a question about hue, not about how red the skin is. All
-     skin is red-dominant; what separates warm from cool is where between
-     yellow and pink it sits. Human skin lands roughly 12°-45°, and the split
-     runs through the middle of that. */
-  const mx = Math.max(avgR, avgG, avgB), mn = Math.min(avgR, avgG, avgB);
-  const chroma = mx - mn;
-  const hue = chroma ? ((avgG - avgB) / chroma) * 60 : 25;   // red is the max for all skin
-  const sat = mx ? chroma / mx : 0;
-
+  const mx2 = Math.max(avgR, avgG, avgB), mn2 = Math.min(avgR, avgG, avgB);
+  const chr = mx2 - mn2;
+  const hue = chr ? ((avgG - avgB) / chr) * 60 : 25;
+  const sat = mx2 ? chr / mx2 : 0;
   let undertone = 'neutral';
   if (hue >= 32 && sat < 0.44) undertone = 'olive';
   else if (hue >= 30) undertone = 'warm';
   else if (hue <= 21) undertone = 'cool';
 
-  const browLum = mean([browLy, browRy].map(y =>
-    mean(Array.from({ length: 9 }, (_, k) =>
-      lum[clamp(y, 0, h - 1) * w + clamp(Math.round(fcx - faceW * 0.2 + k * faceW * 0.05), 0, w - 1)]))));
+  const browLum = (() => {
+    const px = [];
+    for (const e of [eL, eR]) {
+      for (let du = -0.35; du <= 0.35; du += 0.1) {
+        const [x, y] = off(e, du, -P.browV);
+        px.push(lum[clamp(Math.round(y), 0, h - 1) * w + clamp(Math.round(x), 0, w - 1)]);
+      }
+    }
+    return mean(px);
+  })();
   const spread = Math.abs(skinLum - browLum);
   const contrast = spread > 78 ? 'high' : spread > 42 ? 'medium' : 'low';
 
-  const eyeRatio = eyeH / Math.max(eyeW, 1);
-  const lidRoom = (eyeLy - browLy) / Math.max(faceH, 1);
-  const eye_shape = lidRoom < 0.085 ? 'hooded' : eyeRatio > 0.48 ? 'round' : eyeRatio < 0.26 ? 'monolid' : 'almond';
+  /* Face width measured from the skin mask, along the face's own axis. */
+  const widthAt = (v) => {
+    let n = 0;
+    for (let u = -1.3; u <= 1.3; u += 0.04) {
+      const [x, y] = lower(u, v);
+      const xx = clamp(Math.round(x), 0, w - 1), yy = clamp(Math.round(y), 0, h - 1);
+      if (skin[yy * w + xx]) n++;
+    }
+    return n * 0.04;
+  };
+  const foreheadW = widthAt(-P.toHairline * 0.5) || 1.8;
+  const cheekW = widthAt(P.cheekV) || 2.0;
+  const jawW = widthAt(P.toChin * 0.72) || 1.7;
 
-  const lipRatio = mouthH / faceH;
-  const lip_fullness = lipRatio > 0.085 ? 'full' : lipRatio < 0.052 ? 'thin' : 'medium';
-
-  const aspect = faceH / Math.max(faceW, 1);
-  const widthSpread = Math.max(foreheadW, cheekW, jawW) / Math.max(1, Math.min(foreheadW, cheekW, jawW));
+  const aspect = (P.toHairline + P.toChin) / P.faceW;
+  const widthSpread = Math.max(foreheadW, cheekW, jawW) / Math.max(0.1, Math.min(foreheadW, cheekW, jawW));
   let shape;
-  if (aspect > 1.62) shape = 'long';
-  else if (aspect < 1.15) shape = 'round';
-  // Three widths that barely differ is not a diamond or a heart — it is the
-  // face reading the same all the way down.
-  else if (widthSpread < 1.32) shape = jawW > foreheadW * 1.06 ? 'square' : 'oval';
-  else if (foreheadW > jawW * 1.22) shape = 'heart';
-  else if (jawW > foreheadW * 1.22) shape = 'triangle';
-  else if (cheekW > foreheadW * 1.20 && cheekW > jawW * 1.20) shape = 'diamond';
-  else shape = 'oval';
+  if (widthSpread < 1.22) shape = jawW > foreheadW * 1.05 ? 'square' : 'oval';
+  else if (foreheadW > jawW * 1.24) shape = 'heart';
+  else if (jawW > foreheadW * 1.24) shape = 'triangle';
+  else if (cheekW > foreheadW * 1.2 && cheekW > jawW * 1.2) shape = 'diamond';
+  else shape = aspect > 1.28 ? 'long' : 'oval';
 
-  const brow_shape = contrast === 'low' ? 'sparse' : spread > 90 ? 'full' : 'straight';
+  const eyeAspect = (eyes.a.n + eyes.b.n) / 2 / Math.max(1, (D * 0.24) ** 2);
+  const eye_shape = eyeAspect < 0.22 ? 'hooded' : eyeAspect > 0.62 ? 'round' : 'almond';
+  const lipRatio = (halfH * 2) / (P.toChin - P.toHairline);
+  const lip_fullness = lipRatio > 0.115 ? 'full' : lipRatio < 0.07 ? 'thin' : 'medium';
+  const brow_shape = contrast === 'low' ? 'sparse' : spread > 92 ? 'full' : 'straight';
 
-  // Honest about its own footing: a small face in the frame, or an eye it had
-  // to guess at, should not present as a confident reading.
-  const coverage = (faceW * faceH) / N;
-  const confidence = clamp(0.34 + coverage * 1.4 + (bestRed > 2 ? 0.14 : 0) + (contrast !== 'low' ? 0.10 : 0), 0.25, 0.72);
+  const confidence = clamp(
+    0.30 + eyes.skinFrac * 0.30 + (bestRed > 1.2 ? 0.12 : 0) + (contrast !== 'low' ? 0.08 : 0),
+    0.25, 0.75);
 
   const APPLY = {
     hooded: { he: 'עפעף נפול — הנח צללית מעל הקמט, אחרת היא נעלמת כשהעין פקוחה.', en: 'Hooded lids — place shadow above the crease or it disappears when your eyes are open.' },
     round:  { he: 'עין עגולה — מתיחה החוצה בזווית החיצונית מאריכה את הצורה.', en: 'Round eyes — extend the outer corner to lengthen the shape.' },
-    monolid: { he: 'מונוליד — בנה צבע בשכבות מקו הריסים כלפי מעלה, הוא צריך להיראות כשהעין פקוחה.', en: 'Monolid — build colour upward from the lash line so it reads with the eye open.' },
     almond: { he: 'עין שקדית — כמעט כל טכניקה עובדת; שמור על הקמט נקי.', en: 'Almond eyes — nearly any technique works; keep the crease clean.' },
-  };
-
-  const NOTES = {
-    he: `פנים ${shape} · אנדרטון ${undertone} · עומק ${depth} · קונטרסט ${contrast}`,
-    en: `${shape} face · ${undertone} undertone · ${depth} depth · ${contrast} contrast`,
   };
 
   return {
@@ -468,14 +787,14 @@ export async function analyzeFaceLocal(shot) {
       eye_shape,
       lip_fullness,
       brow_shape,
-      notes_he: NOTES.he, notes_en: NOTES.en,
+      notes_he: `פנים ${shape} · אנדרטון ${undertone} · עומק ${depth} · קונטרסט ${contrast}`,
+      notes_en: `${shape} face · ${undertone} undertone · ${depth} depth · ${contrast} contrast`,
       apply_he: APPLY[eye_shape]?.he || '', apply_en: APPLY[eye_shape]?.en || '',
       confidence,
     },
     regions,
   };
 }
-
 /* ============================================================
    2 · Body
    ============================================================ */
