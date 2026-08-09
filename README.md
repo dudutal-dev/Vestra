@@ -72,6 +72,9 @@ It holds the same seven gates, and reads your profile the same way. Your **cover
 ### 📸 Batch cataloging
 Select ten garment photos at once and they catalog in sequence with a progress readout — the fastest way to get a wardrobe in.
 
+### 🧪 A sample wardrobe to try it against
+**Profile → Load sample wardrobe** drops in a 25-piece capsule spanning formality 2 to 6, so the Studio can close a look and the health report has something to count before you have photographed anything of your own. The garments are drawn by the app rather than shipped as files — laid flat on a plain ground, which is the same shot the guide asks you for and the same one the try-on's cutout expects. One tap removes them again, and nothing you added yourself is touched.
+
 ---
 
 ## Privacy

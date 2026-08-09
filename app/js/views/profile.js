@@ -9,6 +9,7 @@ import {
   getProfile, setProfile, Settings, Media, exportAll, importAll, wipeAll, closetScore,
 } from '../store.js';
 import { BODY_SHAPES, COLOR_SEASONS, ARCHETYPES, lbl } from '../taxonomy.js';
+import { loadDemoWardrobe, removeDemoWardrobe, countDemo, DEMO_SIZE } from '../demo.js';
 
 export function renderProfile(root, ctx) {
   const p = { ...getProfile() };
@@ -171,6 +172,8 @@ export function renderProfile(root, ctx) {
             .map(([v, label]) => el('option', { value: v, selected: Settings.model === v || null, text: label })),
         )),
 
+        sampleWardrobeBlock(),
+
         el('div', { class: 'alert alert-med', style: { marginTop: 'var(--s5)' } },
           el('span', { html: icon('download') }),
           el('div', { class: 'grow' },
@@ -210,6 +213,33 @@ export function renderProfile(root, ctx) {
     ),
   );
   observeReveal(root);
+
+  /* ---------- sample wardrobe ---------- */
+  function sampleWardrobeBlock() {
+    const loaded = countDemo(state.items);
+    return el('div', { class: 'card card-flat', style: { marginTop: 'var(--s5)' } },
+      el('div', { class: 'eyebrow', text: t('demo_title') }),
+      el('div', { class: 'micro muted', style: { marginTop: '6px' }, text: t('demo_sub') }),
+      el('button', {
+        class: `btn btn-sm btn-block ${loaded ? 'btn-quiet' : 'btn-ghost'}`,
+        style: { marginTop: 'var(--s3)' },
+        html: icon(loaded ? 'trash' : 'plus') +
+          `<span>${esc(loaded ? `${t('demo_remove')} (${loaded})` : `${t('demo_load')} (${DEMO_SIZE})`)}</span>`,
+        onclick: async (e) => {
+          e.currentTarget.disabled = true;
+          try {
+            const n = loaded ? await removeDemoWardrobe() : await loadDemoWardrobe();
+            await refreshAll();
+            toast(loaded ? `${t('demo_removed')} · ${n}` : `${t('demo_loaded')} · ${n}`);
+            ctx.rerender();
+          } catch {
+            toast(t('err_generic'), 'bad');
+            e.currentTarget.disabled = false;
+          }
+        },
+      }),
+    );
+  }
 
   /* ---------- data actions ---------- */
   async function doExport() {
