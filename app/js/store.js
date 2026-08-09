@@ -125,6 +125,10 @@ export const Settings = {
   set apiKey(v) { v ? localStorage.setItem('vestra.key', v) : localStorage.removeItem('vestra.key'); },
   get model()   { return localStorage.getItem('vestra.model') || 'claude-opus-5'; },
   set model(v)  { localStorage.setItem('vestra.model', v); },
+  // The image-model key. Separate from the Anthropic one: different provider,
+  // different bill, and one is useful without the other.
+  get falKey()  { return localStorage.getItem('vestra.falKey') || ''; },
+  set falKey(v) { v ? localStorage.setItem('vestra.falKey', v) : localStorage.removeItem('vestra.falKey'); },
   get theme()   { return localStorage.getItem('vestra.theme') || 'light'; },
   set theme(v)  { localStorage.setItem('vestra.theme', v); document.documentElement.dataset.theme = v; },
   get seen()    { return localStorage.getItem('vestra.seen') === '1'; },

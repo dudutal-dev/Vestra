@@ -163,6 +163,21 @@ export function renderProfile(root, ctx) {
           }),
         )),
 
+        field(t('p_fal'), el('div', { class: 'stack g2' },
+          el('input', {
+            class: 'input', type: 'password', autocomplete: 'off', spellcheck: 'false',
+            placeholder: t('p_fal_ph'), value: Settings.falKey,
+            oninput: e => { Settings.falKey = e.target.value.trim(); },
+          }),
+          el('p', { class: 'micro muted', style: { margin: 0 }, text: t('p_fal_help') }),
+          el('a', {
+            class: 'micro', href: 'https://fal.ai/dashboard/keys',
+            target: '_blank', rel: 'noopener noreferrer',
+            style: { color: 'var(--oxblood)', textDecoration: 'none' },
+            text: t('p_get_fal') + ' →',
+          }),
+        )),
+
         field(t('p_model'), el('select', {
           class: 'select', onchange: e => { Settings.model = e.target.value; },
         },
