@@ -5,6 +5,14 @@
    own photo. It is a styling illustration — the garments are positioned and
    feathered into the photo, not warped onto your body — so treat it as a
    composition aid, not a photorealistic render.
+
+   The garment photos are shot on a plain background, per the guide. Pasting
+   them straight onto the body brings that background with them, which is what
+   made the old preview read as a stack of rectangles. So each thumbnail is
+   first cut out: flood-fill the plain surround from the border, drop it to
+   transparent, and soften the resulting edge. When the background turns out
+   not to be plain, the cutout is abandoned and the piece falls back to the
+   feathered paste — better a soft rectangle than a garment with a hole in it.
    ============================================================ */
 
 import { loadImage } from './makeup.js';
@@ -13,11 +21,6 @@ import { loadImage } from './makeup.js';
 const px = (box, w, h) => ({
   x: (box?.x ?? 0) * w, y: (box?.y ?? 0) * h,
   w: (box?.w ?? 0) * w, h: (box?.h ?? 0) * h,
-});
-
-const inset = (b, fx, fy) => ({
-  x: b.x + b.w * fx, y: b.y + b.h * fy,
-  w: b.w * (1 - fx * 2), h: b.h * (1 - fy * 2),
 });
 
 const grow = (b, fx, fy) => ({
@@ -53,9 +56,185 @@ function placement(item, R) {
   }
 }
 
-/** Draw an image into a box, cover-fitted and feathered at the edges. */
-function drawFeathered(ctx, img, box, alpha, radius = 0.16) {
+/* ============================================================
+   Background removal
+   ============================================================ */
+
+/* Keyed on the thumbnail data URL. The opacity slider re-renders on every
+   input event, and without this each drag re-decoded and re-cut every piece. */
+const CUTOUTS = new Map();
+const CUTOUT_LIMIT = 48;
+
+const TOL = 38;              // per-channel distance that still counts as background
+const BUSY_BORDER = 0.35;    // above this share of odd border pixels, don't try
+const MIN_REMOVED = 0.06;    // below this, the cut found nothing worth having
+const MAX_REMOVED = 0.94;    // above this, it ate the garment
+
+const median = (arr) => {
+  const s = Float64Array.from(arr).sort();
+  return s[s.length >> 1];
+};
+
+/**
+ * Cut the plain background out of a garment photo.
+ * @returns {HTMLCanvasElement|null} null when the photo isn't a clean shot.
+ */
+function buildCutout(img) {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  if (!iw || !ih) return null;
+
+  // Working small: the cutout is an alpha shape, and the garment is redrawn
+  // from it at whatever size the body box needs.
+  const S = 384;
+  const scale = Math.min(1, S / Math.max(iw, ih));
+  const w = Math.max(4, Math.round(iw * scale));
+  const h = Math.max(4, Math.round(ih * scale));
+
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, w, h);
+
+  let image;
+  try {
+    image = ctx.getImageData(0, 0, w, h);
+  } catch {
+    return null;   // tainted canvas — leave the photo alone
+  }
+  const d = image.data;
+
+  // The border ring is the background sample.
+  const border = [];
+  for (let x = 0; x < w; x++) { border.push(x); border.push((h - 1) * w + x); }
+  for (let y = 1; y < h - 1; y++) { border.push(y * w); border.push(y * w + w - 1); }
+
+  const br = median(border.map(i => d[i * 4]));
+  const bg = median(border.map(i => d[i * 4 + 1]));
+  const bb = median(border.map(i => d[i * 4 + 2]));
+
+  const isBg = (i) => {
+    const o = i * 4;
+    return Math.abs(d[o] - br) <= TOL && Math.abs(d[o + 1] - bg) <= TOL && Math.abs(d[o + 2] - bb) <= TOL;
+  };
+
+  // A garment shot against a room rather than a wall has a border that doesn't
+  // agree with itself. Bail before doing damage.
+  let odd = 0;
+  for (const i of border) if (!isBg(i)) odd++;
+  if (odd / border.length > BUSY_BORDER) return null;
+
+  // Flood-fill inwards from the border. Only background connected to the edge
+  // is removed, so a white shirt button stays opaque.
+  const N = w * h;
+  const seen = new Uint8Array(N);
+  const queue = new Int32Array(N);
+  let qs = 0, qe = 0;
+  for (const i of border) if (!seen[i] && isBg(i)) { seen[i] = 1; queue[qe++] = i; }
+
+  while (qs < qe) {
+    const i = queue[qs++];
+    const x = i % w, y = (i / w) | 0;
+    if (x > 0)     { const j = i - 1; if (!seen[j] && isBg(j)) { seen[j] = 1; queue[qe++] = j; } }
+    if (x < w - 1) { const j = i + 1; if (!seen[j] && isBg(j)) { seen[j] = 1; queue[qe++] = j; } }
+    if (y > 0)     { const j = i - w; if (!seen[j] && isBg(j)) { seen[j] = 1; queue[qe++] = j; } }
+    if (y < h - 1) { const j = i + w; if (!seen[j] && isBg(j)) { seen[j] = 1; queue[qe++] = j; } }
+  }
+
+  const frac = qe / N;
+  if (frac < MIN_REMOVED || frac > MAX_REMOVED) return null;
+
+  for (let i = 0; i < N; i++) if (seen[i]) d[i * 4 + 3] = 0;
+  softenAlpha(d, w, h);
+
+  ctx.putImageData(image, 0, 0);
+  return trim(c, d, w, h);
+}
+
+/**
+ * Crop away the transparent surround.
+ *
+ * Without this the cutout is still the whole original frame with a hole
+ * punched round the garment, so fitting it to a body box fits the empty
+ * margin too and the piece lands a fraction of its proper size.
+ */
+function trim(canvas, d, w, h) {
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (d[(y * w + x) * 4 + 3] > 8) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < minX || maxY < minY) return null;
+
+  const tw = maxX - minX + 1, th = maxY - minY + 1;
+  if (tw === w && th === h) return canvas;
+
+  const out = document.createElement('canvas');
+  out.width = tw; out.height = th;
+  out.getContext('2d').drawImage(canvas, minX, minY, tw, th, 0, 0, tw, th);
+  return out;
+}
+
+/** One 3x3 blur pass over the alpha channel, so the cut edge isn't a staircase. */
+function softenAlpha(d, w, h) {
+  const src = new Uint8ClampedArray(w * h);
+  for (let i = 0; i < w * h; i++) src[i] = d[i * 4 + 3];
+
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      // Interior and exterior pixels are already settled; only the rim moves.
+      const a = src[i];
+      if (a === 255 && src[i - 1] === 255 && src[i + 1] === 255 && src[i - w] === 255 && src[i + w] === 255) continue;
+      if (a === 0 && src[i - 1] === 0 && src[i + 1] === 0 && src[i - w] === 0 && src[i + w] === 0) continue;
+      const sum = src[i - w - 1] + src[i - w] + src[i - w + 1]
+                + src[i - 1]     + a          + src[i + 1]
+                + src[i + w - 1] + src[i + w] + src[i + w + 1];
+      d[i * 4 + 3] = sum / 9;
+    }
+  }
+}
+
+function cutoutFor(img) {
+  const key = img.src;
+  if (CUTOUTS.has(key)) return CUTOUTS.get(key);
+  let out = null;
+  try { out = buildCutout(img); } catch { out = null; }
+  if (CUTOUTS.size >= CUTOUT_LIMIT) CUTOUTS.delete(CUTOUTS.keys().next().value);
+  CUTOUTS.set(key, out);
+  return out;
+}
+
+/* ---------------- drawing ---------------- */
+
+/**
+ * Draw a piece into a box.
+ *
+ * With a cutout the shape is already the garment, so it is fitted whole
+ * (contain) and drawn as-is — cropping or feathering it would only cut into
+ * the silhouette. Without one, the old behaviour stands: cover-fit and feather
+ * the rim so the rectangle melts into the photo instead of sitting on it.
+ */
+function drawPiece(ctx, img, cut, box, alpha, radius = 0.16) {
   if (!box || box.w <= 2 || box.h <= 2) return;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  if (cut) {
+    const iw = cut.width, ih = cut.height;
+    const s = Math.min(box.w / iw, box.h / ih);
+    const dw = iw * s, dh = ih * s;
+    ctx.drawImage(cut, box.x + (box.w - dw) / 2, box.y + (box.h - dh) / 2, dw, dh);
+    ctx.restore();
+    return;
+  }
 
   const off = document.createElement('canvas');
   off.width = Math.max(2, Math.round(box.w));
@@ -69,8 +248,7 @@ function drawFeathered(ctx, img, box, alpha, radius = 0.16) {
   const dw = iw * scale, dh = ih * scale;
   o.drawImage(img, (off.width - dw) / 2, (off.height - dh) / 2, dw, dh);
 
-  // Feather the rim so the piece melts into the photo instead of sitting on it
-  // as a rectangle. destination-in keeps only what the gradient marks as opaque.
+  // destination-in keeps only what the gradient marks as opaque.
   const g = o.createRadialGradient(
     off.width / 2, off.height / 2, 0,
     off.width / 2, off.height / 2, Math.max(off.width, off.height) * 0.62,
@@ -82,9 +260,16 @@ function drawFeathered(ctx, img, box, alpha, radius = 0.16) {
   o.fillStyle = g;
   o.fillRect(0, 0, off.width, off.height);
 
-  ctx.save();
-  ctx.globalAlpha = alpha;
   ctx.drawImage(off, box.x, box.y, box.w, box.h);
+  ctx.restore();
+}
+
+/** Draw a mirrored copy of a piece — the second shoe of a pair. */
+function drawMirrored(ctx, img, cut, box, alpha) {
+  ctx.save();
+  ctx.translate(box.x + box.w, box.y);
+  ctx.scale(-1, 1);
+  drawPiece(ctx, img, cut, { x: 0, y: 0, w: box.w, h: box.h }, alpha);
   ctx.restore();
 }
 
@@ -117,16 +302,32 @@ export async function renderTryOn(canvas, bodyPhoto, regions, items, opts = {}) 
     (a, b) => LAYER.indexOf(a.category) - LAYER.indexOf(b.category),
   );
 
+  // Decode every thumbnail at once rather than one await at a time — the
+  // preview used to appear piece by piece.
+  const loaded = await Promise.all(ordered.map(item =>
+    item.thumb
+      ? loadImage(item.thumb).then(img => ({ item, img })).catch(() => null)
+      : null));
+
   let placed = 0;
-  for (const item of ordered) {
-    if (!item.thumb) continue;
+  for (const entry of loaded) {
+    if (!entry) continue;                    // a broken thumbnail shouldn't sink the preview
+    const { item, img } = entry;
     const box = placement(item, R);
     if (!box) continue;
-    try {
-      const img = await loadImage(item.thumb);
-      drawFeathered(ctx, img, box, alpha);
-      placed++;
-    } catch { /* a broken thumbnail shouldn't sink the whole preview */ }
+
+    const cut = cutoutFor(img);
+
+    // Shoes come as one photo of a pair, so one box over both feet stretches
+    // them into a smear. Half the box each, the second mirrored.
+    if (item.category === 'shoes' && box.w > 8) {
+      const half = { x: box.x, y: box.y, w: box.w / 2, h: box.h };
+      drawPiece(ctx, img, cut, half, alpha);
+      drawMirrored(ctx, img, cut, { ...half, x: box.x + box.w / 2 }, alpha);
+    } else {
+      drawPiece(ctx, img, cut, box, alpha);
+    }
+    placed++;
   }
   return placed;
 }

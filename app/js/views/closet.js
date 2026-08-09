@@ -123,11 +123,11 @@ function renderHealth(ctx) {
       try {
         const data = hasKey()
           ? await wardrobeHealth({ wardrobe: state.items.map(slimItem), profile: state.profile })
-          : healthLocal(state.items);
+          : healthLocal(state.items, state.profile);
         paint(data);
       } catch (e) {
         toast(errText(e), 'warn');
-        paint(healthLocal(state.items));
+        paint(healthLocal(state.items, state.profile));
       } finally {
         runBtn.remove();
       }
@@ -190,6 +190,18 @@ function renderHealth(ctx) {
           el('span', { html: icon('alert') }),
           el('div', { text: pick(x, 'text') }),
         ))) : null,
+
+      (d.dead_items || []).length ? el('div', { class: 'card' },
+        el('div', { class: 'eyebrow', style: { marginBottom: 'var(--s3)' }, text: '💤 ' + (isHe() ? 'פריטים שלא נכנסים ללוקים' : 'Pieces that never make a look') }),
+        el('p', { class: 'micro muted', style: { marginBottom: 'var(--s3)' }, text: d.looks_tested
+          ? (isHe() ? `לא נבחרו באף אחד מ-${d.looks_tested} הלוקים שנבדקו` : `Not chosen in any of the ${d.looks_tested} looks tested`)
+          : (isHe() ? 'לא נבחרו באף לוק' : 'Not chosen in any look') }),
+        el('div', { class: 'row g2 wrap' },
+          d.dead_items.slice(0, 12).map(id => {
+            const it = state.items.find(x => x.id === id);
+            return it ? el('span', { class: 'tag', text: pick(it, 'name') || catName(it.category) }) : null;
+          }).filter(Boolean)),
+      ) : null,
 
       (d.buy_next || []).length ? el('div', { class: 'card' },
         el('div', { class: 'eyebrow', style: { marginBottom: 'var(--s3)' }, text: '🛒 ' + (isHe() ? 'הרכישות המשתלמות ביותר' : 'Highest-leverage buys') }),

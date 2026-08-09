@@ -53,13 +53,17 @@ Upload a full-length photo and you get body shape, shoulder-to-hip ratio, propor
 > This is a styling illustration, not a photorealistic render — the pieces are placed and feathered onto detected body regions, not warped onto your body.
 
 ### 📊 Wardrobe health
-Distribution by category, formality, colour and season · single-colour dominance warnings · near-duplicate detection · your workhorse pieces · and the three purchases that would unlock the most new outfits.
+The report builds a look for **every occasion the app knows** and then counts what happened, so the numbers are observed rather than estimated. Your workhorses are the pieces that actually turned up in the most outfits. **Pieces that never make a look** are the ones the engine never once reached for. The shopping list is ranked by how often a missing piece genuinely stopped an outfit from closing.
+
+Alongside it: distribution by category, formality, colour and season · single-colour dominance warnings · near-duplicate detection.
 
 ### 🌍 Genuinely bilingual
 Hebrew (RTL) and English (LTR) throughout — including the AI's own output, which is generated in both languages in a single call. Serif display type switches per script.
 
 ### 🔌 Works without an API key
 No key? The built-in **rules engine** still builds looks, pairs items, and runs the health report locally — using the same scoring model as the skill. Cataloguing falls back to a full manual form. Add a key whenever you want automatic recognition.
+
+It holds the same seven gates, and reads your profile the same way. Your **coverage level** and **never-wearing** list remove pieces before scoring rather than merely discouraging them. **Fabric is judged against the weather** — wool and heavy layers leave a hot day on their own. Your **body shape** moves where volume and interest land: up top for a pear, down for an inverted triangle, a long vertical line for an apple, a defined waist for a rectangle. And the same request always returns the same look.
 
 ---
 
