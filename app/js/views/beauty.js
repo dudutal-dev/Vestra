@@ -9,7 +9,7 @@ import { hasKey } from '../store.js';
 import { beautyLook, errText } from '../ai.js';
 import { renderMakeup, loadImage } from '../makeup.js';
 import { downloadCanvas } from '../tryon.js';
-import { openMakeupBrief } from './brief.js';
+import { openMakeupBrief, openFullBrief } from './brief.js';
 import { BEAUTY_LOOKS, OCCASION_BEAUTY, OCCASIONS, occName, lbl } from '../taxonomy.js';
 
 /* Offline reference looks — SKILL.md Module 7.2 / 7.3 */
@@ -325,8 +325,17 @@ function simulationBlock(look, ctx) {
       intensityRange,
     ),
     el('p', { class: 'micro muted', style: { margin: 0 }, text: t('sim_disclaimer') }),
+    // With an outfit already built, the two briefs are one job: the same
+    // photograph, the same person, one set of instructions. Splitting them
+    // means running the render twice and getting two different people back.
+    state.lastLook ? el('button', {
+      class: 'btn btn-primary btn-block btn-sm',
+      html: icon('sparkles') + `<span>${esc(t('brief_full_open'))}</span>`,
+      onclick: () => openFullBrief(state.lastLook, { makeup: look, intensity: intensityForBrief() }),
+    }) : null,
     el('button', {
-      class: 'btn btn-ghost btn-block btn-sm',
+      class: state.lastLook ? 'btn btn-quiet btn-block btn-sm' : 'btn btn-ghost btn-block btn-sm',
+      style: state.lastLook ? { marginTop: 'var(--s2)' } : null,
       html: icon('sparkles') + `<span>${esc(t('brief_open'))}</span>`,
       onclick: () => openMakeupBrief(look, { intensity: intensityForBrief() }),
     }),
@@ -376,6 +385,17 @@ function faceCard() {
 }
 
 /* ---------------- Local reference look ---------------- */
+/**
+ * The makeup the app would suggest for an outfit, without opening the beauty
+ * screen — so a look's brief can carry its face as well as its clothes.
+ */
+export function makeupForLook(look) {
+  const key = look?.makeup_look
+    || (state.request?.occasion ? OCCASION_BEAUTY[state.request.occasion] : null)
+    || 'soft-definition';
+  return localLook(key);
+}
+
 function localLook(key) {
   const src = LOCAL[key] || LOCAL['soft-definition'];
   return {

@@ -187,3 +187,108 @@ export function tryOnAttachments({ look, items = [] } = {}) {
     .filter(i => i?.thumb)
     .map(i => ({ id: i.id, name_en: i.name_en || enSub(i.subcategory), thumb: i.thumb }));
 }
+
+/* ============================================================
+   The full brief — one photograph, both changes
+   ============================================================ */
+
+/** The garment lines, without the framing — so the full brief can reuse them. */
+function garmentLines(look, items) {
+  return (look?.items || [])
+    .map(entry => ({ slot: entry.slot, item: items.find(i => i.id === entry.id) }))
+    .filter(x => x.item)
+    .map(({ item, slot }) => describeItem(item, slot));
+}
+
+/** The makeup product lines, same idea. */
+function makeupLines(look) {
+  return (look?.steps || [])
+    .map(s => ({ s, technique: techniqueFor(s) }))
+    .filter(({ technique, s }) => TECHNIQUE_PHRASE[technique] && hex(s.shade_hex))
+    .map(({ s, technique }) => `- ${TECHNIQUE_PHRASE[technique](hex(s.shade_hex))}`
+      + (s.finish ? ` Finish: ${s.finish}.` : ''));
+}
+
+/**
+ * One brief covering the outfit and the makeup together, with the photographs
+ * it refers to numbered in the order they are attached.
+ *
+ * Numbering is the point. A model handed six images and a paragraph has to
+ * guess which one is the person and which is the handbag, and it guesses
+ * wrong — the outfit comes back on the wrong body, or a garment photo gets
+ * treated as the scene. Naming each photograph by its position removes the
+ * guess, and it is the only reason this works as a single paste.
+ *
+ * Both halves share one PRESERVE clause rather than carrying their own,
+ * because two paragraphs saying "do not change the face" in different words is
+ * how a model ends up weighing them against each other.
+ *
+ * @returns {{text: string, photos: Array}|null}
+ */
+export function fullBrief({
+  look = null, makeup = null, items = [], face = null, body = null,
+  occasion = null, intensity = 1, subject = null, faceCloseUp = null,
+} = {}) {
+  const clothes = look ? garmentLines(look, items) : [];
+  const products = makeup ? makeupLines(makeup) : [];
+  if (!clothes.length && !products.length) return null;
+  if (!subject) return null;
+
+  const photos = [{ role: 'subject', label_en: 'the person', dataUrl: subject, filename: 'vestra-subject.jpg' }];
+  const manifest = ['Photo 1 — the person. Every change below is applied to this photograph.'];
+
+  const attached = look ? tryOnAttachments({ look, items }) : [];
+  for (const a of attached) {
+    photos.push({ role: 'garment', label_en: a.name_en, dataUrl: a.thumb, filename: `vestra-${a.name_en.replace(/[^\w]+/g, '-').toLowerCase()}.jpg` });
+    manifest.push(`Photo ${photos.length} — ${a.name_en}, one of the garments to put on them.`);
+  }
+
+  // A separate, closer photograph of the face makes the makeup land; without
+  // one the model works from whatever resolution the full-length shot gives it.
+  if (faceCloseUp && faceCloseUp !== subject && products.length) {
+    photos.push({ role: 'face', label_en: 'the face, close up', dataUrl: faceCloseUp, filename: 'vestra-face.jpg' });
+    manifest.push(`Photo ${photos.length} — the same person's face, closer. Reference for the makeup only; the result is Photo 1.`);
+  }
+
+  const out = [
+    'Retouch the attached photograph of one person. Return one image.',
+    '',
+    'PHOTOGRAPHS',
+    ...manifest,
+    '',
+    'WHAT TO CHANGE',
+  ];
+
+  let n = 0;
+  if (clothes.length) {
+    out.push(`${++n}. Clothing — replace everything they are wearing with exactly this, and nothing more:`);
+    out.push(...clothes.map(l => '   ' + l));
+    if (attached.length) {
+      out.push('   Reproduce those garments from their photographs — colour, fabric, cut, every detail —'
+        + ' rather than inventing something similar. The written line is there to disambiguate the photograph, not to replace it.');
+    }
+    out.push('   The clothes must sit on the body as real cloth: correct drape, folds where the fabric gathers,'
+      + ' contact shadows where it meets the body, and the hem falling where the stated length says it should.');
+    if (look?.silhouette_en) out.push(`   Intended silhouette: ${look.silhouette_en}`);
+    if (body?.shape) out.push(`   The body shape is ${body.shape}; the fit should read correctly on that frame.`);
+  }
+
+  if (products.length) {
+    out.push(`${++n}. Makeup — apply exactly these products, and nothing else:`);
+    out.push(...products.map(l => '   ' + l));
+    out.push('   ' + (intensity < 0.75 ? 'Keep it restrained — this should read as barely-there.'
+      : intensity > 1.2 ? 'Make it deliberate and camera-ready, but still wearable.'
+      : 'Everyday intensity: clearly present, never heavy.'));
+    if (face?.eye_shape && FACE_NOTE[face.eye_shape]) out.push('   ' + FACE_NOTE[face.eye_shape]);
+    if (face?.lip_fullness && FACE_NOTE[face.lip_fullness]) out.push('   ' + FACE_NOTE[face.lip_fullness]);
+    if (face?.skin_undertone) out.push(`   The skin undertone is ${face.skin_undertone}; keep the colours true to it.`);
+    if (face?.skin_depth) out.push(`   Skin depth is ${face.skin_depth} — the shades are chosen for it and must not be lightened or darkened to compensate.`);
+  }
+
+  if (occasion) out.push('', `The occasion is ${enOcc(occasion)}.`);
+
+  out.push('', 'WHAT MUST NOT CHANGE', PRESERVE);
+  if (clothes.length) out.push('Do not add any garment or accessory that is not listed above.');
+
+  return { text: out.join('\n'), photos };
+}

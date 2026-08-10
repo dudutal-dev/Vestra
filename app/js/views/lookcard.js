@@ -7,7 +7,8 @@ import { el, icon, esc } from '../ui.js';
 import { t, pick, isHe } from '../i18n.js';
 import { slotName, catIcon, hexFor } from '../taxonomy.js';
 import { itemById } from '../state.js';
-import { openTryOnBrief } from './brief.js';
+import { openTryOnBrief, openFullBrief } from './brief.js';
+import { makeupForLook } from './beauty.js';
 
 const noteBlock = (label, body) => body
   ? el('div', { class: 'look-note' },
@@ -96,8 +97,17 @@ export function renderLookCard(look, { onSave, onBeauty, saved } = {}) {
         onclick: () => onBeauty(look),
       }) : null,
     ),
+    // The brief that carries everything: the outfit, the matching makeup, and
+    // every photograph both of them name. The canvas simulation is instant and
+    // free; this is the one that comes back as a photograph.
+    el('button', {
+      class: 'btn btn-sm btn-primary btn-block',
+      html: icon('sparkles') + `<span>${esc(t('brief_full_open'))}</span>`,
+      onclick: () => openFullBrief(look, { makeup: makeupForLook(look) }),
+    }),
     el('button', {
       class: 'btn btn-sm btn-quiet btn-block',
+      style: { marginTop: 'var(--s2)' },
       html: icon('sparkles') + `<span>${esc(t('brief_open'))}</span>`,
       onclick: () => openTryOnBrief(look),
     }),
