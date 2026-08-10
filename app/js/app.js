@@ -15,6 +15,7 @@ import { renderCloset } from './views/closet.js';
 import { renderBeauty } from './views/beauty.js';
 import { renderProfile } from './views/profile.js';
 import { renderAnchors } from './views/anchors.js';
+import { renderLooks, deleteLook } from './views/looks.js';
 import { renderLookCard } from './views/lookcard.js';
 
 const VIEWS = {
@@ -25,6 +26,7 @@ const VIEWS = {
   closet:   renderCloset,
   beauty:   renderBeauty,
   anchors:  renderAnchors,
+  looks:    renderLooks,
   profile:  renderProfile,
 };
 
@@ -55,7 +57,16 @@ const ctx = {
   go,
   rerender: render,
   openItem: (item) => openItemSheet(item, ctx),
-  openLook: (look) => openSheet(el('div', {}, renderLookCard(look))),
+  openLook: (look) => {
+    // A look on the shelf can be taken off it. A studio result that has not
+    // been saved yet has nothing stored to remove, so it gets no delete button.
+    const onShelf = state.looks.some(l => l.id === look?.id);
+    const close = openSheet(el('div', {}, renderLookCard(look, {
+      onDelete: onShelf
+        ? async (l) => { if (await deleteLook(l)) { close(); render(); } }
+        : null,
+    })));
+  },
   startPair: (item) => {
     state.anchorId = item.id;
     state.pairResult = null;

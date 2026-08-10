@@ -190,7 +190,7 @@ vestra/
 │       ├── makeup.js             # canvas makeup renderer (adaptive blend modes)
 │       ├── tryon.js              # garment placement + lookbook export
 │       ├── ui.js                 # icons, toasts, sheets, sparkles
-│       └── views/                # home · wardrobe · capture · studio · closet · beauty · profile
+│       └── views/                # home · wardrobe · capture · studio · closet · beauty · looks · profile
 ├── GUIDE.md                      # user guide — Hebrew + English
 ├── skill/vestra-fashion-stylist/
 │   ├── SKILL.md                  # the expert

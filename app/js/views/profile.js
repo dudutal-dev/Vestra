@@ -6,10 +6,13 @@ import { el, icon, esc, toast, confirmSheet, openSheet, observeReveal, $ } from 
 import { t, isHe, setLang, lang } from '../i18n.js';
 import { state, refreshAll, refreshMedia } from '../state.js';
 import {
-  getProfile, setProfile, Settings, Media, exportAll, importAll, wipeAll, closetScore,
+  getProfile, setProfile, Settings, Media, exportAll, importAll, wipeAll, closetScore, hasKey,
 } from '../store.js';
 import { BODY_SHAPES, COLOR_SEASONS, ARCHETYPES, lbl } from '../taxonomy.js';
 import { loadDemoWardrobe, removeDemoWardrobe, countDemo, DEMO_SIZE } from '../demo.js';
+
+/* Bumped by hand when something ships that the owner would notice. */
+const APP_VERSION = '1.4 · F/W 26-27';
 
 export function renderProfile(root, ctx) {
   const p = { ...getProfile() };
@@ -125,6 +128,19 @@ export function renderProfile(root, ctx) {
           el('div', { class: 'slot-name', style: { marginTop: '4px' }, text: t('guide_title') }),
         ),
         el('span', { html: icon('sparkles'), style: { width: '22px', color: 'var(--oxblood)' } }),
+      ),
+
+      /* ---------- About ---------- */
+      el('button', {
+        class: 'card card-lift row between g3 on-scroll',
+        style: { width: '100%', textAlign: 'start', cursor: 'pointer' },
+        onclick: openAbout,
+      },
+        el('div', { class: 'grow' },
+          el('div', { class: 'eyebrow', text: t('p_about') }),
+          el('div', { class: 'slot-name', style: { marginTop: '4px' }, text: t('about_title') }),
+        ),
+        el('span', { html: icon('user'), style: { width: '22px', color: 'var(--oxblood)' } }),
       ),
 
       /* ---------- My photos ---------- */
@@ -406,4 +422,41 @@ function themeSwitch() {
     },
   });
   return sw;
+}
+
+/* ============================================================
+   About
+   ============================================================ */
+export function openAbout() {
+  /* `ltr` on values that are pure Latin/punctuation. Left to inherit, a string
+     like "1.4 · F/W 26-27" gets reordered by the bidi algorithm inside an RTL
+     page — the neutral separator flips the two runs and the version reads
+     backwards. */
+  const line = (label, value, ltr = false) => el('div', { class: 'kv' },
+    el('dt', { text: label }),
+    el('dd', { text: value, dir: ltr ? 'ltr' : null }));
+
+  openSheet(el('div', {},
+    el('div', { class: 'eyebrow', text: t('p_about') }),
+    el('h3', { style: { marginBlock: '6px var(--s2)', fontSize: 'var(--t-2xl)' }, text: 'VESTRA' }),
+    el('p', { class: 'tiny muted', style: { marginBottom: 'var(--s4)' }, text: t('about_tagline') }),
+
+    el('div', { class: 'card stack g2' },
+      el('div', { class: 'eyebrow', text: t('about_by') }),
+      el('div', { class: 'slot-name', style: { fontSize: 'var(--t-lg)', fontWeight: 600 }, text: 'Dudu Tal · דודו טל' }),
+      el('p', { class: 'tiny muted', style: { margin: 0 }, text: t('about_by_note') }),
+    ),
+
+    el('p', { class: 'tiny', style: { marginTop: 'var(--s4)', lineHeight: 1.6 }, text: t('about_what') }),
+    el('p', { class: 'tiny', style: { marginTop: 'var(--s3)', lineHeight: 1.6 }, text: t('about_privacy') }),
+
+    el('div', { class: 'card stack g1', style: { marginTop: 'var(--s4)' } },
+      line(t('about_engine'), hasKey() ? 'Claude · api.anthropic.com' : t('about_engine_local'), hasKey()),
+      line(t('about_items'), String(state.items.length)),
+      line(t('about_looks'), String(state.looks.length)),
+      line(t('about_version'), APP_VERSION, true),
+    ),
+
+    el('p', { class: 'micro muted', style: { marginTop: 'var(--s4)' }, text: t('about_licence') }),
+  ));
 }

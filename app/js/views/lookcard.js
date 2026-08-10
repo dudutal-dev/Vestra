@@ -17,7 +17,7 @@ const noteBlock = (label, body) => body
       el('div', { class: 'tiny', text: body }))
   : null;
 
-export function renderLookCard(look, { onSave, onBeauty, saved } = {}) {
+export function renderLookCard(look, { onSave, onBeauty, saved, onDelete } = {}) {
   if (!look) return el('div');
 
   const items = (look.items || [])
@@ -116,6 +116,15 @@ export function renderLookCard(look, { onSave, onBeauty, saved } = {}) {
       html: icon('sparkles') + `<span>${esc(t('brief_open'))}</span>`,
       onclick: () => openTryOnBrief(look),
     }),
+
+    // Only offered for a look that is actually on the shelf. A studio result
+    // that has not been saved has nothing to delete.
+    onDelete ? el('button', {
+      class: 'btn btn-sm btn-quiet btn-block',
+      style: { marginTop: 'var(--s3)', color: 'var(--danger)' },
+      html: icon('trash') + `<span>${esc(t('looks_delete'))}</span>`,
+      onclick: () => onDelete(look),
+    }) : null,
   );
 }
 

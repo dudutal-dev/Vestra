@@ -12,6 +12,7 @@ import { renderTryOn, renderLookbook, downloadCanvas } from '../tryon.js';
 import { loadImage } from '../makeup.js';
 import { OCCASIONS, TIMES, WEATHER, MOODS, occName, catIcon, lbl, formalityName } from '../taxonomy.js';
 import { renderLookCard } from './lookcard.js';
+import { matchingLooks, lookTile } from './looks.js';
 
 const MIN_ITEMS = 4;
 
@@ -24,6 +25,34 @@ export function renderStudio(root, ctx) {
 
   const r = state.request;
 
+  /* Before building anything, check the shelf.
+     A look costs a render or a model call or a few minutes of answering
+     questions, and the second wedding should not cost any of them again. This
+     appears the moment an occasion is picked and says nothing at all when
+     there is no good match — a wrong suggestion here means arriving dressed
+     wrong, which is worse than no suggestion. */
+  const savedMatch = el('div', { class: 'stack g2' });
+  const paintMatch = () => {
+    const hits = r.occasion ? matchingLooks(r.occasion) : [];
+    savedMatch.replaceChildren(...(hits.length ? [
+      el('div', { class: 'card stack g3' },
+        el('div', {},
+          el('div', { class: 'eyebrow', text: t('looks_saved_match') }),
+          el('p', { class: 'tiny muted', style: { margin: '4px 0 0' }, text: t('looks_saved_match_s') }),
+        ),
+        el('div', { class: 'row g3 scroll-x', style: { alignItems: 'flex-start' } },
+          hits.slice(0, 3).map(m => el('div', { style: { width: '138px' } },
+            lookTile(m.look, (l) => ctx.openLook(l))))),
+      ),
+    ] : []));
+    /* The tiles carry `.on-scroll`, which starts at opacity 0 and is lifted only
+       when the reveal observer sees them scroll in. That is wrong here: this card
+       is the answer to a tap, and the occasion grid is tall enough that it often
+       lands below the fold — the suggestion would be an empty box until the user
+       happened to scroll. Reveal them outright. */
+    savedMatch.querySelectorAll('.on-scroll').forEach(n => n.classList.add('is-in'));
+  };
+
   const occGrid = el('div', { class: 'grid-items stagger', style: { gridTemplateColumns: 'repeat(auto-fill,minmax(112px,1fr))' } },
     OCCASIONS.map(o => el('button', {
       class: `card card-lift ${r.occasion === o.key ? 'is-picked' : ''}`,
@@ -33,6 +62,7 @@ export function renderStudio(root, ctx) {
         r.occasion = o.key;
         [...occGrid.children].forEach(n => { n.style.boxShadow = ''; });
         e.currentTarget.style.boxShadow = '0 0 0 2px var(--oxblood)';
+        paintMatch();
         buzz();
       },
     },
@@ -87,6 +117,7 @@ export function renderStudio(root, ctx) {
       ),
       anchorCard,
       block(t('st_occasion'), occGrid),
+      savedMatch,
       block(t('st_time'), timeSeg),
       block(t('st_weather'), weatherSeg),
       block(t('st_mood'), moodSeg),
@@ -98,6 +129,7 @@ export function renderStudio(root, ctx) {
       ),
     ),
   );
+  paintMatch();          // an occasion may already be chosen from last time
   observeReveal(root);
 
   /* ---------- build ---------- */
@@ -134,6 +166,10 @@ export function renderStudio(root, ctx) {
         result.createdAt = Date.now();
         result.occasion_he ||= occName(r.occasion);
         result.occasion_en ||= occName(r.occasion);
+        // The key, not just the label: a saved look is matched against a future
+        // occasion by this, and a translated label cannot be matched at all.
+        result.occasion_key = r.occasion;
+        result.weather = r.weather || null;
         state.lastLook = result;
       }
       buzz(20);

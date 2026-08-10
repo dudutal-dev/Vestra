@@ -91,7 +91,7 @@ export function renderHome(root, { go, openItem, openLook, rerender }) {
   });
 
   const looks = state.looks.length
-    ? section(t('home_looks'), null, null,
+    ? section(t('home_looks'), t('looks_see_all'), () => go('looks'),
         el('div', {},
           el('div', { class: 'scroll-x' },
             state.looks.slice(0, 8).map(l => renderLookMini(l, openLook))),
