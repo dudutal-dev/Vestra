@@ -160,54 +160,6 @@ function paintWash(ctx, region, w, h, hex, hardness, alpha) {
   });
 }
 
-/** The outline of a mouth: two peaks, a dip between them, one full lower lip. */
-function lipOutline(ctx) {
-  ctx.beginPath();
-  ctx.moveTo(-1, 0.02);
-  ctx.bezierCurveTo(-0.74, -0.66, -0.54, -0.94, -0.34, -0.80);
-  ctx.bezierCurveTo(-0.22, -0.70, -0.10, -0.40, 0, -0.46);
-  ctx.bezierCurveTo(0.10, -0.40, 0.22, -0.70, 0.34, -0.80);
-  ctx.bezierCurveTo(0.54, -0.94, 0.74, -0.66, 1, 0.02);
-  ctx.bezierCurveTo(0.72, 0.78, 0.36, 1.0, 0, 1.0);
-  ctx.bezierCurveTo(-0.36, 1.0, -0.72, 0.78, -1, 0.02);
-  ctx.closePath();
-}
-
-/**
- * Lipstick.
- *
- * A single ellipse over the mouth covers the teeth and the line between the
- * lips, which is exactly what makes a preview look pasted on. This fills the
- * lip shape, darkens the rim the way a lip pencil does, and leaves the mouth
- * line readable.
- */
-function paintLips(ctx, region, w, h, hex, alpha) {
-  return inRegion(ctx, region, w, h, (c) => {
-    lipOutline(c);
-
-    // Centre a touch lighter than the rim — how a lip actually catches light.
-    const grad = c.createRadialGradient(0, 0.12, 0.04, 0, 0, 1.3);
-    grad.addColorStop(0, rgba(hex, alpha));
-    grad.addColorStop(0.58, rgba(hex, alpha));
-    grad.addColorStop(1, darker(hex, 0.80, alpha));
-    c.fillStyle = grad;
-    c.fill();
-
-    // The pencil rim.
-    c.strokeStyle = darker(hex, 0.72, alpha * 0.85);
-    c.lineWidth = 0.07;
-    c.stroke();
-
-    // The mouth line, so the lips stay two lips.
-    c.strokeStyle = darker(hex, 0.50, alpha * 0.55);
-    c.lineWidth = 0.05;
-    c.beginPath();
-    c.moveTo(-0.92, 0.02);
-    c.quadraticCurveTo(0, 0.16, 0.92, 0.02);
-    c.stroke();
-  });
-}
-
 /**
  * Eyeliner along the upper lash line.
  *
@@ -384,8 +336,11 @@ function eraseWash(ctx, region, w, h, shrink = 1) {
    region rather than a fixed threshold, so the same code works on a face lit
    from one side, on any skin depth, and in any white balance.
 
-   If the feature can't be told apart from its surroundings the mask comes back
-   null and the drawn shape takes over — a rough shape beats no product at all.
+   If the feature can't be told apart from its surroundings — the anchor landed
+   on a chin, the light flattened the mouth — the mask comes back null and the
+   caller falls back to a soft wash. Never to a drawn shape: an outline that
+   misses reads as a lipstick print stamped beside the mouth, which is worse
+   than no lipstick at all.
    ============================================================ */
 
 const smoothstep = (a, b, x) => {
@@ -460,7 +415,7 @@ const FEATURE = {
     pad: 1.8,
     // Reaches past the ellipse, but not as far as the chin: the crease under a
     // lower lip is reddish too, and left unchecked the lipstick runs onto it.
-    ring: [1.6, 3.0], edge: [1.18, 1.58],
+    ring: [1.6, 3.0], edge: [0.88, 1.10],
     // Redness as a share of total brightness, so a lip in shadow and a lip
     // catching the light score the same. A plain Cr-Cb difference does not:
     // it collapses in the shadow at the mouth corners and on the wet
@@ -468,7 +423,13 @@ const FEATURE = {
     value: (r, g, b) => (255 * (r - (g + b) / 2)) / (r + g + b + 1),
     floor: 5,        // below this the mouth isn't distinguishable — give up
     blur: 0.055,
-    lo: 0.12, hi: 0.52,
+    lo: 0.22, hi: 0.60,
+    // Redness alone cannot separate a lip from the skin beside it: a warm
+    // cheek and the flush at a mouth corner are red too, and they touch the
+    // lip, so growing a blob outward walks straight into them. A lip is also
+    // *darker* than the skin around it — the two together draw the line that
+    // either one alone does not.
+    darker: 3,
   },
   brow: {
     // Tighter: an eye socket is dark too, and a brow mask that reaches down
@@ -526,6 +487,24 @@ function featureMask(photo, region, w, h, kind) {
   const val = blurField(raw, box.w, box.h,
     Math.round((spec.blur || 0) * Math.min(box.w, box.h)));
 
+  // Luminance, for features that are defined by being darker than their ring
+  // as well as by their colour.
+  let lumField = null, lumRef = 0;
+  if (spec.darker) {
+    const rawLum = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const o = i * 4;
+      rawLum[i] = luminance(d[o], d[o + 1], d[o + 2]);
+    }
+    lumField = blurField(rawLum, box.w, box.h,
+      Math.round((spec.blur || 0) * Math.min(box.w, box.h)));
+    const ringLum = [];
+    for (let i = 0; i < N; i++) {
+      if (rad[i] > spec.ring[0] && rad[i] < spec.ring[1]) ringLum.push(lumField[i]);
+    }
+    lumRef = median(ringLum);
+  }
+
   // The ring is skin: outside the feature, close enough to share its light.
   const ring = [];
   for (let i = 0; i < N; i++) {
@@ -541,10 +520,52 @@ function featureMask(photo, region, w, h, kind) {
   if (peak < spec.floor) return null;   // nothing here stands out — fall back
 
   const lo = peak * spec.lo, hi = peak * spec.hi;
+
+  /* One blob, the one under the anchor.
+     A mouth is a single connected thing. Blotchy skin, a warm chin, a mole and
+     the shadow at a nostril all clear a redness threshold too, and tinting
+     every pixel that passes scatters lipstick across the lower half of a face.
+     Growing outward from the anchor keeps whatever the anchor is actually
+     sitting on and leaves the rest alone. */
+  const above = new Uint8Array(N);
+  for (let i = 0; i < N; i++) {
+    if (val[i] - ref < lo) continue;
+    if (rad[i] > spec.edge[1] ** 2) continue;
+    if (lumField && lumField[i] > lumRef - spec.darker) continue;
+    above[i] = 1;
+  }
+
+  const seedX = Math.round(ecx), seedY = Math.round(ecy);
+  let seed = -1;
+  for (let r = 0; r <= Math.max(4, Math.round(Math.min(rx, ry) * 0.9)) && seed < 0; r++) {
+    for (let a = 0; a < 16 && seed < 0; a++) {
+      const x = seedX + Math.round(r * Math.cos((a * Math.PI) / 8));
+      const y = seedY + Math.round(r * Math.sin((a * Math.PI) / 8));
+      if (x < 0 || y < 0 || x >= box.w || y >= box.h) continue;
+      if (above[y * box.w + x]) seed = y * box.w + x;
+    }
+  }
+  if (seed < 0) return null;   // the anchor is not on the feature at all
+
+  const keep = new Uint8Array(N);
+  const queue = new Int32Array(N);
+  let qs = 0, qe = 0;
+  keep[seed] = 1; queue[qe++] = seed;
+  while (qs < qe) {
+    const i = queue[qs++];
+    const x = i % box.w, y = (i / box.w) | 0;
+    if (x > 0 && above[i - 1] && !keep[i - 1]) { keep[i - 1] = 1; queue[qe++] = i - 1; }
+    if (x < box.w - 1 && above[i + 1] && !keep[i + 1]) { keep[i + 1] = 1; queue[qe++] = i + 1; }
+    if (y > 0 && above[i - box.w] && !keep[i - box.w]) { keep[i - box.w] = 1; queue[qe++] = i - box.w; }
+    if (y < box.h - 1 && above[i + box.w] && !keep[i + box.w]) { keep[i + box.w] = 1; queue[qe++] = i + box.w; }
+  }
+  // A blob that has swallowed the search box is not a mouth, it is the skin.
+  if (qe > N * 0.55) return null;
+
   for (let i = 0; i < N; i++) {
     // Fade out past the search radius so the ring itself cannot be painted.
     const edge = 1 - smoothstep(spec.edge[0], spec.edge[1], Math.sqrt(rad[i]));
-    const a = smoothstep(lo, hi, val[i] - ref) * edge;
+    const a = keep[i] ? smoothstep(lo, hi, val[i] - ref) * edge : 0;
     const o = i * 4;
     d[o] = 255; d[o + 1] = 255; d[o + 2] = 255;
     d[o + 3] = Math.round(clamp(a, 0, 1) * 255);
@@ -832,8 +853,13 @@ export function renderMakeup(canvas, photo, regions, steps, opts = {}) {
 
       const draw = (a) => {
         switch (technique) {
+          // No mask means the photograph could not tell us where the lips are.
+          // The answer to that is a soft tint of roughly the right place, not a
+          // drawn mouth: a glyph is never quite this mouth, and when the anchor
+          // is off it lands beside it as a lipstick print on a cheek. A wash
+          // that misses is a faint blush; a shape that misses is a sticker.
           case 'lipstick':  return cut ? paintThroughMask(lctx, cut, step.shade_hex, a)
-            : paintLips(lctx, region, w, h, step.shade_hex, a);
+            : paintWash(lctx, region, w, h, step.shade_hex, 0.05, a * 0.5);
           case 'liner':     return paintLiner(lctx, region, w, h, step.shade_hex, a, outward, wing);
           case 'lashes':    return paintLashes(lctx, region, w, h, step.shade_hex, a, outward);
           case 'brow':      return cut ? paintThroughMask(lctx, cut, step.shade_hex, a)
