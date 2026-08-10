@@ -120,10 +120,53 @@ export function lookTile(look, onOpen) {
   );
 }
 
+/**
+ * Everything about a look that is worth searching, as one lowercase string.
+ *
+ * A look is remembered by its pieces far more often than by its label — "the
+ * one with the camel coat", "that black dress" — and none of those words are in
+ * the title. So the index reaches through to the garments and pulls in their
+ * names, subcategories and colours alongside the look's own writing, in both
+ * languages, because the owner switches between them and the saved look does
+ * not.
+ */
+export function lookText(look) {
+  const parts = [
+    look.title_he, look.title_en, look.occasion_he, look.occasion_en,
+    look.silhouette_he, look.silhouette_en, look.why_it_works_he, look.why_it_works_en,
+    look.trend_note_he, look.trend_note_en, look.notes,
+  ];
+  for (const c of look.palette || []) parts.push(c.name_he, c.name_en);
+  for (const row of look.items || []) {
+    parts.push(row.reason_he, row.reason_en);
+    const item = itemById(row.id);
+    if (!item) continue;
+    parts.push(item.name_he, item.name_en, item.subcategory, item.category,
+      item.pattern, item.fabric_guess);
+    // A colour is an object, not a string — pushing it whole indexes the words
+    // "object Object" on every look and none of the colours on any of them.
+    for (const c of [item.color_primary, ...(item.color_secondary || [])]) {
+      if (c) parts.push(c.name_he, c.name_en);
+    }
+  }
+  return parts.filter(s => typeof s === 'string').join(' ').toLowerCase();
+}
+
+/** Saved looks matching a free-text query — every word must appear somewhere. */
+export function searchLooks(query, looks = state.looks) {
+  const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return looks;
+  return looks.filter((look) => {
+    const hay = lookText(look);
+    return words.every(w => hay.includes(w));
+  });
+}
+
 export function renderLooks(root, ctx) {
   const looks = state.looks;
 
   let filter = ctx.opts?.occasion || '';
+  let query = '';
 
   const grid = el('div', { class: 'grid-items stagger',
     style: { gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))' } });
@@ -132,14 +175,21 @@ export function renderLooks(root, ctx) {
     /* Exact, not `matchingLooks`. That function answers "could this be worn
        there", which is what a suggestion wants; a chip labelled "cocktail" that
        lists a gym look is just wrong. */
-    const list = filter ? looks.filter(l => occasionKeyOf(l) === filter) : looks;
+    const byOcc = filter ? looks.filter(l => occasionKeyOf(l) === filter) : looks;
+    const list = searchLooks(query, byOcc);
     grid.replaceChildren(...(list.length
       ? list.map(l => lookTile(l, ctx.openLook))
-      : [el('p', { class: 'tiny muted', text: filter ? t('looks_none_match') : t('looks_none') })]));
+      : [el('p', { class: 'tiny muted',
+          text: query ? t('looks_none_found') : filter ? t('looks_none_match') : t('looks_none') })]));
     observeReveal(grid);
   };
 
-  const chips = el('div', { class: 'seg scroll-x', style: { marginBottom: 'var(--s4)' } },
+  const search = el('input', {
+    class: 'input', type: 'search', placeholder: t('looks_search_ph'),
+    oninput: (e) => { query = e.target.value; paint(); },
+  });
+
+  const chips = el('div', { class: 'seg scroll-x' },
     el('button', {
       class: `chip ${filter ? '' : 'is-on'}`, text: t('filter_all'),
       onclick: (e) => {
@@ -181,6 +231,7 @@ export function renderLooks(root, ctx) {
           onclick: async () => { if (await newLookFromImages()) ctx.rerender(); },
         }),
       ),
+      looks.length ? search : null,
       looks.length ? chips : null,
       grid,
     ),

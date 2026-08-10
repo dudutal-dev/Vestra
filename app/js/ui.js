@@ -135,6 +135,15 @@ export function openSheet(contentNode, { onClose } = {}) {
     if (dy > 110) close();
     y0 = null;
   });
+  /* iOS ends a touch with `touchcancel`, not `touchend`, when the system takes
+     the gesture over — which is exactly what happens when the share sheet comes
+     up mid-drag. Without this the sheet keeps whatever translateY it had reached
+     and `y0` stays live: the panel sits pushed off the bottom of the screen with
+     the scrim still covering everything, and the app looks frozen. */
+  sheet.addEventListener('touchcancel', () => {
+    sheet.style.transform = '';
+    y0 = null;
+  });
 
   return close;
 }

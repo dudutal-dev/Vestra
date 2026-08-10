@@ -80,10 +80,55 @@ async function asFile(dataUrl, filename) {
  * awaited, for the same reason — it lands during the gesture while `share` is
  * still the thing being called from it.
  */
+/**
+ * Call `navigator.share` without letting it take the app down with it.
+ *
+ * Two things go wrong on iOS, and neither is ours to fix — only to survive. The
+ * promise `share` returns does not always settle: dismissed with a swipe rather
+ * than the Cancel button, it can simply hang. And WebKit refuses a second share
+ * while it believes one is still in flight, so once one has hung every share
+ * after it fails too. That is what "the whole app is stuck" actually is — a
+ * disabled button, a scrim over everything, and nothing that will ever answer.
+ *
+ * So: one share at a time, and the UI stops waiting after a few seconds
+ * whatever the promise decides to do. The share itself is left running — if the
+ * sheet really is still up, the owner can still pick an app from it.
+ */
+let sharing = false;
+
+function shareOnce(payload) {
+  if (sharing) return Promise.resolve('busy');
+  sharing = true;
+
+  let settled = false;
+  const done = (v) => { settled = true; sharing = false; return v; };
+
+  const call = navigator.share(payload).then(
+    () => done('shared'),
+    (e) => done(e?.name === 'AbortError' ? 'cancelled' : 'unsupported'));
+
+  // The watchdog frees the button; it does not cancel the share. It releases
+  // `sharing` as well, because a share that has not answered in six seconds is
+  // one WebKit has lost track of, and refusing every later attempt on its
+  // behalf helps nobody.
+  const watchdog = new Promise(resolve => setTimeout(() => {
+    if (settled) return;
+    sharing = false;
+    resolve('pending');
+  }, 6000));
+
+  return Promise.race([call, watchdog]);
+}
+
 async function sharePhotosAndCopy(text, files) {
   if (!navigator.share || !files?.length) return 'unsupported';
   const payload = { files };
   if (navigator.canShare && !navigator.canShare(payload)) return 'unsupported';
+
+  /* `share` goes first. Both calls want the user gesture, and the clipboard is
+     the one that can be dropped without breaking anything — the brief is still
+     in the textarea to copy by hand. Losing the share loses the handover. */
+  const res = shareOnce(payload);
 
   let copied = true;
   try {
@@ -92,12 +137,9 @@ async function sharePhotosAndCopy(text, files) {
     copied = false;
   }
 
-  try {
-    await navigator.share(payload);
-    return copied ? 'shared' : 'shared-no-copy';
-  } catch (e) {
-    return e?.name === 'AbortError' ? 'cancelled' : 'unsupported';
-  }
+  const out = await res;
+  if (out !== 'shared') return out;
+  return copied ? 'shared' : 'shared-no-copy';
 }
 
 /** Text and files in one share — right where the platform allows it. */
@@ -105,12 +147,7 @@ async function shareEverything(text, files) {
   if (!navigator.share || !files?.length) return 'unsupported';
   const payload = { text, files };
   if (navigator.canShare && !navigator.canShare(payload)) return 'unsupported';
-  try {
-    await navigator.share(payload);
-    return 'shared';
-  } catch (e) {
-    return e?.name === 'AbortError' ? 'cancelled' : 'unsupported';
-  }
+  return shareOnce(payload);
 }
 
 /**
@@ -157,7 +194,12 @@ export function openBrief({ kind, prompt, photos = [] }) {
   const shareResult = (res) => {
     if (res === 'shared') { buzz(14); toast(t('brief_share_done')); return; }
     if (res === 'shared-no-copy') { buzz(14); toast(t('brief_share_nocopy'), 'warn'); return; }
-    if (res === 'cancelled') return;
+    if (res === 'cancelled' || res === 'busy') return;
+    // The system sheet never answered. Saying nothing would be wrong — the
+    // button just came back to life and the owner needs to know it is tappable
+    // again — but so would calling it a failure, because the share may well
+    // have gone through.
+    if (res === 'pending') { toast(t('brief_share_slow'), 'warn'); return; }
     toast(t('brief_share_no'), 'warn');
   };
 
