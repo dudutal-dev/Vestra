@@ -9,6 +9,7 @@ import { slotName, catIcon, hexFor } from '../taxonomy.js';
 import { itemById } from '../state.js';
 import { openTryOnBrief, openFullBrief } from './brief.js';
 import { makeupForLook } from './beauty.js';
+import { renderStrip } from './renders.js';
 
 const noteBlock = (label, body) => body
   ? el('div', { class: 'look-note' },
@@ -97,6 +98,10 @@ export function renderLookCard(look, { onSave, onBeauty, saved } = {}) {
         onclick: () => onBeauty(look),
       }) : null,
     ),
+    // Where the render comes back to. The strip is above the brief on purpose:
+    // once a look has a photograph, that photograph is the look.
+    renderStrip(look),
+
     // The brief that carries everything: the outfit, the matching makeup, and
     // every photograph both of them name. The canvas simulation is instant and
     // free; this is the one that comes back as a photograph.

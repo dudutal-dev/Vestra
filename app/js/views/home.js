@@ -8,8 +8,9 @@ import { state } from '../state.js';
 import { closetScore } from '../store.js';
 import { TRENDS_TICKER, catIcon, lbl } from '../taxonomy.js';
 import { renderLookMini } from './lookcard.js';
+import { newLookFromImages } from './renders.js';
 
-export function renderHome(root, { go, openItem, openLook }) {
+export function renderHome(root, { go, openItem, openLook, rerender }) {
   const p = state.profile;
   const items = state.items;
   const score = closetScore(items);
@@ -80,12 +81,23 @@ export function renderHome(root, { go, openItem, openLook }) {
         }),
       );
 
+  // A look can also start as a picture: a render that came back from an image
+  // model, or a photograph of something actually worn. It goes on the same
+  // shelf as the rest, because that is where the owner will look for it.
+  const addFromPhoto = el('button', {
+    class: 'btn btn-quiet btn-block btn-sm tiny', style: { marginTop: 'var(--s3)' },
+    html: icon('image') + `<span>${esc(t('render_new_look'))}</span>`,
+    onclick: async () => { if (await newLookFromImages()) rerender(); },
+  });
+
   const looks = state.looks.length
     ? section(t('home_looks'), null, null,
-        el('div', { class: 'scroll-x' },
-          state.looks.slice(0, 8).map(l => renderLookMini(l, openLook))),
+        el('div', {},
+          el('div', { class: 'scroll-x' },
+            state.looks.slice(0, 8).map(l => renderLookMini(l, openLook))),
+          addFromPhoto),
       )
-    : null;
+    : section(t('home_looks'), null, null, addFromPhoto);
 
   root.replaceChildren(
     el('div', { class: 'pad stack g5', style: { paddingTop: 'var(--s4)' } }, hero),
