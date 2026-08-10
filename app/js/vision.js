@@ -250,13 +250,38 @@ export function foreground(data, w, h) {
 }
 
 /**
- * Candidate whites of eyes: small, bright, almost colourless, and with
- * something much darker immediately beside them. The size ceiling is what
- * rejects a pale wall — a wall is one enormous component, an eye white is a
- * few dozen pixels.
+ * Candidate whites of eyes: small, bright, almost colourless, with something
+ * much darker immediately beside them — and set in a face. The size ceiling is
+ * what rejects a pale wall: a wall is one enormous component, an eye white is
+ * a few dozen pixels.
+ *
+ * The face test is the one that matters on a photograph of someone with long
+ * dark hair. A glossy strand is bright against the few millimetres around it,
+ * almost colourless, and has dark hair right beside it — it passes every other
+ * test here, and on one straight-haired subject seventy of them outnumbered
+ * the two real eyes and buried the pair.
+ *
+ * Testing the surrounding pixels for skin colour is not enough on its own,
+ * because lit brown hair *is* skin-coloured: warm, mid-bright, red above green
+ * above blue. What separates them is structure rather than colour. Skin forms
+ * one large connected region — a face — while the skin-coloured pixels in hair
+ * are strands: thin, broken and small. So a candidate has to sit inside a skin
+ * region big enough to be a face.
  */
-export function scleraCandidates(lum, chroma, fg, w, h) {
+export function scleraCandidates(lum, chroma, skin, fg, w, h) {
   const N = w * h;
+
+  /* The face, as the largest skin regions in the frame. Plural because a nose
+     shadow can cut one face into two, and because a photo may legitimately
+     hold an arm as well as a face. */
+  const faceish = new Uint8Array(N);
+  {
+    const MIN_REGION = N * 0.012;
+    for (const c of components(skin, w, h)) {
+      if (c.members.length < MIN_REGION) continue;
+      for (const i of c.members) faceish[i] = 1;
+    }
+  }
 
   // Brightness measured against the whole frame is the wrong question — lit
   // skin is brighter than a median that dark hair drags down, so a global
@@ -300,10 +325,24 @@ export function scleraCandidates(lum, chroma, fg, w, h) {
     }
     if (darkest > own * 0.66) continue;
 
-    out.push({
-      cx: (c.x0 + c.x1) / 2, cy: (c.y0 + c.y1) / 2,
-      n, lum: own, w: bw, h: bh,
-    });
+    // And it has to be set in a face. Sampled as a ring rather than a disc,
+    // because the patch itself is an eye white and never counts as skin.
+    const cx = (c.x0 + c.x1) / 2, cy = (c.y0 + c.y1) / 2;
+    const inner = Math.max(bw, bh) * 0.9;
+    const outer = Math.max(inner + 3, Math.max(bw, bh) * 3.0);
+    let ringN = 0, ringFace = 0;
+    for (let y = Math.round(cy - outer); y <= cy + outer; y++) {
+      for (let x = Math.round(cx - outer); x <= cx + outer; x++) {
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        const dd = (x - cx) ** 2 + (y - cy) ** 2;
+        if (dd < inner * inner || dd > outer * outer) continue;
+        ringN++;
+        if (faceish[y * w + x]) ringFace++;
+      }
+    }
+    if (ringN < 12 || ringFace / ringN < 0.35) continue;
+
+    out.push({ cx, cy, n, lum: own, w: bw, h: bh, faceRing: ringFace / ringN });
   }
   return out;
 }
@@ -468,18 +507,30 @@ export function pickEyePair(cands, ctx) {
          and a misplaced frame is not, so mirroring the frame across that line
          and comparing is what separates them. A turned head costs a little
          symmetry; a frame anchored on the wrong point loses far more. */
-      let symDiff = 0, symN = 0;
+      const diffs = [];
       for (let v = -0.7; v <= 1.45; v += 0.15) {
         for (let u = 0.2; u <= 0.95; u += 0.15) {
           const [xa, ya] = at(u, v), [xb, yb] = at(-u, v);
           if (xa < 0 || ya < 0 || xa >= w || ya >= h) continue;
           if (xb < 0 || yb < 0 || xb >= w || yb >= h) continue;
-          symDiff += Math.abs(lum[px(xa, ya)] - lum[px(xb, yb)]);
-          symN++;
+          diffs.push(Math.abs(lum[px(xa, ya)] - lum[px(xb, yb)]));
         }
       }
-      if (symN < 20) continue;
-      const symmetry = 1 - clamp((symDiff / symN) / 55, 0, 1);
+      if (diffs.length < 20) continue;
+
+      /* The median, not the mean.
+         The frame has to reach the edges of the face for this test to have any
+         power — narrow it to the interior and a patch of hair, which is
+         self-similar everywhere, passes as a face. But at those edges hair
+         falls differently on the two sides of almost every portrait, and a
+         handful of pairs comparing cheek against black hair is enough to drag
+         a mean past the threshold and reject a perfectly centred photograph.
+         A real face is symmetric in most of the pairs and wildly asymmetric in
+         a few; a wrong frame is moderately wrong in all of them. The median
+         reads that difference and the mean cannot. */
+      diffs.sort((m, n) => m - n);
+      const symDiff = diffs[diffs.length >> 1];
+      const symmetry = 1 - clamp(symDiff / 55, 0, 1);
       if (symmetry < 0.25) continue;
 
       const level = 1 - Math.abs(dy) / Math.max(dx, 1);
@@ -607,7 +658,7 @@ export async function analyzeFaceLocal(shot) {
 
   const fg = foreground(data, w, h);
   const cands = mergeNear(
-    snapToPupil(scleraCandidates(lum, chroma, fg, w, h), lum, fg, w, h),
+    snapToPupil(scleraCandidates(lum, chroma, skin, fg, w, h), lum, fg, w, h),
     w * 0.022);
   const eyes = cands.length >= 2 ? pickEyePair(cands, { lum, red, skin, fg, w, h }) : null;
 
