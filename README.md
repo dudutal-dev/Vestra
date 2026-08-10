@@ -53,7 +53,11 @@ Everything else is shaped the way it is worn. Eyeshadow is a run of soft dabs al
 
 The strengths are deliberately low — a blush at 0.17 is a flush, at 0.4 it is a pink disc with a visible edge — so the photograph's own texture and luminance survive every pass. Blend mode is chosen from the skin tone sampled under each region, so blush reads correctly on fair and deep skin alike; everything is masked to the face so nothing tints your hair; and the masks are computed once and cached, so dragging the intensity slider stays smooth.
 
-Five makeup looks plus a grooming track, all current to F/W 26-27: oxblood lips, deliberate imperfection, smudged smokey, monochromatic face, double cat-eye, cosmic highlighter.
+**Thirteen makeup looks plus a grooming track**, and half of them carry real colour: coral, lilac, copper, fuchsia, cobalt at the lash line, green smoke, the classic red, a double cat-eye in black. Each is current to F/W 26-27.
+
+**Every step names an actual product.** That is how the trade talks — a makeup artist does not say "a blue-red matte", they say Ruby Woo — and it is what makes the list buyable. Each step carries a reference (MAC Retro Matte · Ruby Woo) and a pharmacy alternative (Maybelline SuperStay Matte Ink · Pioneer), so the look works at either end of a budget. It sharpens the render brief too: a famous shade carries more to an image model than any adjective, because it has seen it.
+
+The hex is the authority, not the name. Shade names get renamed and formulas get discontinued, so the colour is what the simulation paints and what the brief instructs; the product is named alongside it as the thing to look for on a shelf, and the app says so.
 
 ### 🪞 See the look on you
 Upload a full-length photo and you get body shape, shoulder-to-hip ratio, proportions and concrete cut advice — plus the outfit **positioned over your own photo** with an opacity slider, and a **downloadable lookbook** card (1080×1350).

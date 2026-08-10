@@ -262,11 +262,21 @@ export const ARCHETYPES = [
 ];
 
 /* ---------------- Beauty looks (SKILL.md Module 7.2) ---------------- */
+/* The bloom is the colour the look actually leaves on a face — it is the swatch
+   on the menu, so it has to be the shade rather than a house tint. */
 export const BEAUTY_LOOKS = [
   { key: 'no-makeup',       tKey: 'look_nomakeup',  dKey: 'd_nomakeup',  bloom: 'radial-gradient(circle, rgba(212,180,160,.35), transparent 70%)' },
   { key: 'soft-definition', tKey: 'look_soft',      dKey: 'd_soft',      bloom: 'radial-gradient(circle, rgba(185,163,196,.35), transparent 70%)' },
+  { key: 'coral-fresh',     tKey: 'look_coral',     dKey: 'd_coral',     bloom: 'radial-gradient(circle, rgba(240,117,90,.38), transparent 70%)' },
   { key: 'soft-evening',    tKey: 'look_evening',   dKey: 'd_evening',   bloom: 'radial-gradient(circle, rgba(168,83,92,.35), transparent 70%)' },
+  { key: 'lilac-wash',      tKey: 'look_lilac',     dKey: 'd_lilac',     bloom: 'radial-gradient(circle, rgba(169,139,196,.4), transparent 70%)' },
+  { key: 'copper-glow',     tKey: 'look_copper',    dKey: 'd_copper',    bloom: 'radial-gradient(circle, rgba(178,106,60,.4), transparent 70%)' },
+  { key: 'berry-bold',      tKey: 'look_berry',     dKey: 'd_berry',     bloom: 'radial-gradient(circle, rgba(179,40,107,.4), transparent 70%)' },
+  { key: 'cobalt-liner',    tKey: 'look_cobalt',    dKey: 'd_cobalt',    bloom: 'radial-gradient(circle, rgba(31,79,216,.38), transparent 70%)' },
+  { key: 'green-smoke',     tKey: 'look_green',     dKey: 'd_green',     bloom: 'radial-gradient(circle, rgba(63,91,58,.42), transparent 70%)' },
+  { key: 'red-carpet',      tKey: 'look_red',       dKey: 'd_red',       bloom: 'radial-gradient(circle, rgba(179,18,43,.4), transparent 70%)' },
   { key: 'statement',       tKey: 'look_statement', dKey: 'd_statement', bloom: 'radial-gradient(circle, rgba(110,31,40,.4), transparent 70%)' },
+  { key: 'graphic-noir',    tKey: 'look_noir',      dKey: 'd_noir',      bloom: 'radial-gradient(circle, rgba(14,12,12,.42), transparent 70%)' },
   { key: 'editorial',       tKey: 'look_editorial', dKey: 'd_editorial', bloom: 'radial-gradient(circle, rgba(198,166,103,.4), transparent 70%)' },
   { key: 'grooming',        tKey: 'look_grooming',  dKey: 'd_grooming',  bloom: 'radial-gradient(circle, rgba(107,79,63,.35), transparent 70%)' },
 ];
@@ -278,10 +288,11 @@ export const OCCASION_BEAUTY = {
   'work-tech':'soft-definition', 'work-corp':'soft-definition', interview:'soft-definition',
   'client-meet':'soft-definition', conference:'soft-definition', 'video-call':'soft-definition',
   brit:'soft-definition', synagogue:'soft-definition', funeral:'no-makeup',
-  date:'soft-evening', dinner:'soft-evening', 'bar-club':'soft-evening', theatre:'soft-evening',
-  'wedding-day':'statement', 'wedding-night':'statement', cocktail:'statement',
-  'black-tie':'statement', gala:'statement', birthday:'statement', 'bar-mitzvah':'statement',
-  gallery:'editorial', festival:'editorial',
+  date:'soft-evening', dinner:'soft-evening', theatre:'soft-evening',
+  'bar-club':'berry-bold',
+  'wedding-day':'coral-fresh', 'wedding-night':'statement', cocktail:'red-carpet',
+  'black-tie':'red-carpet', gala:'statement', birthday:'berry-bold', 'bar-mitzvah':'copper-glow',
+  gallery:'graphic-noir', festival:'editorial',
 };
 
 /* ---------------- Trend ticker (from trends-2026.md) ---------------- */

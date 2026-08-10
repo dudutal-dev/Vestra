@@ -82,9 +82,13 @@ export function makeupPrompt({ look, face = null, intensity = 1 } = {}) {
     : intensity > 1.2 ? 'Make it deliberate and camera-ready, but still wearable.'
     : 'Everyday intensity: clearly present, never heavy.';
 
+  // The product name carries more to an image model than any adjective: a
+  // famous shade is something it has seen, and "Ruby Woo" fixes the exact
+  // blue-red and the exact flatness that "a red matte" leaves open.
   const items = steps.map(({ s, technique }) =>
     `- ${TECHNIQUE_PHRASE[technique](hex(s.shade_hex))}`
-    + (s.finish ? ` Finish: ${s.finish}.` : ''));
+    + (s.finish ? ` Finish: ${s.finish}.` : '')
+    + (s.ref ? ` Reference product: ${s.ref} — match its colour and finish; the hex wins if they disagree.` : ''));
 
   const notes = [];
   if (face?.eye_shape && FACE_NOTE[face.eye_shape]) notes.push(FACE_NOTE[face.eye_shape]);
@@ -206,7 +210,11 @@ function makeupLines(look) {
     .map(s => ({ s, technique: techniqueFor(s) }))
     .filter(({ technique, s }) => TECHNIQUE_PHRASE[technique] && hex(s.shade_hex))
     .map(({ s, technique }) => `- ${TECHNIQUE_PHRASE[technique](hex(s.shade_hex))}`
-      + (s.finish ? ` Finish: ${s.finish}.` : ''));
+      + (s.finish ? ` Finish: ${s.finish}.` : '')
+      // The product name carries more to an image model than any adjective:
+      // a famous shade is something it has seen, and "Ruby Woo" fixes the
+      // exact blue-red and the exact flatness that "a red matte" leaves open.
+      + (s.ref ? ` Reference product: ${s.ref} — match its colour and finish, and the hex above wins if they disagree.` : ''));
 }
 
 /**

@@ -13,15 +13,35 @@ import { openMakeupBrief, openFullBrief } from './brief.js';
 import { BEAUTY_LOOKS, OCCASION_BEAUTY, OCCASIONS, occName, lbl } from '../taxonomy.js';
 
 /* Offline reference looks — SKILL.md Module 7.2 / 7.3 */
+/* Offline reference looks — SKILL.md Module 7.2 / 7.3
+
+   Every step names a real product as well as a hex.
+
+   That is how the industry actually talks: a makeup artist does not say "a
+   blue-red matte", they say Ruby Woo, and the person buying it needs a name on
+   a shelf. It also sharpens the render brief, because a famous shade carries
+   more information to an image model than any adjective — it has seen it.
+
+   Two rules keep it honest. `ref` is a well-known reference and `alt` is
+   something from a pharmacy shelf, so the look is buyable at either end. And
+   the hex is the authority, not the name: shade names get renamed and
+   formulations get discontinued, so the colour is what the simulation and the
+   brief actually use, with the product named alongside it as the thing to look
+   for. */
 const LOCAL = {
   'no-makeup': {
     look_name_he: 'No-Makeup', look_name_en: 'No-Makeup', duration_minutes: 5,
     steps: [
-      { area: 'skin', technique: 'base', finish: 'natural', instruction_he: 'סקין-טינט דק בשכבה אחת, קונסילר נקודתי בלבד', instruction_en: 'A single thin layer of skin tint, concealer only where needed', shade_hex: '#E8CBB4' },
-      { area: 'brows', technique: 'brow', instruction_he: 'ג׳ל גבות שקוף — לסרק כלפי מעלה', instruction_en: 'Clear brow gel, brushed upward', shade_hex: '#6B4F3F' },
-      { area: 'cheeks', technique: 'blush', instruction_he: 'קרם-בלאש אפרסק, לטפוח באצבע', instruction_en: 'Cream blush in peach, pressed in with a finger', shade_hex: '#E8A183' },
-      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה חומה, שכבה אחת', instruction_en: 'Brown mascara, one coat', shade_hex: '#4A3228' },
-      { area: 'lips', technique: 'lipstick', finish: 'satin', instruction_he: 'באלם עם גוון', instruction_en: 'Tinted balm', shade_hex: '#C98C86' },
+      { area: 'skin', technique: 'base', finish: 'natural', instruction_he: 'סקין-טינט דק בשכבה אחת, קונסילר נקודתי בלבד', instruction_en: 'A single thin layer of skin tint, concealer only where needed', shade_hex: '#E8CBB4',
+        ref: 'Glossier Perfecting Skin Tint', alt: 'Maybelline Fit Me Fresh Tint' },
+      { area: 'brows', technique: 'brow', instruction_he: 'ג׳ל גבות שקוף — לסרק כלפי מעלה', instruction_en: 'Clear brow gel, brushed upward', shade_hex: '#6B4F3F',
+        ref: 'Anastasia Beverly Hills Clear Brow Gel', alt: 'Essence Make Me Brow' },
+      { area: 'cheeks', technique: 'blush', instruction_he: 'קרם-בלאש אפרסק, לטפוח באצבע', instruction_en: 'Cream blush in peach, pressed in with a finger', shade_hex: '#E8A183',
+        ref: 'Rare Beauty Soft Pinch Liquid Blush · Hope', alt: 'Milani Cheek Kiss Cream Blush' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה חומה, שכבה אחת', instruction_en: 'Brown mascara, one coat', shade_hex: '#4A3228',
+        ref: 'Benefit They’re Real · Beyond Brown', alt: 'L’Oréal Telescopic · Brown' },
+      { area: 'lips', technique: 'lipstick', finish: 'satin', instruction_he: 'באלם עם גוון', instruction_en: 'Tinted balm', shade_hex: '#C98C86',
+        ref: 'Dior Lip Glow · 012 Rosewood', alt: 'Nivea Rich Care Tinted Balm' },
     ],
     trend_he: 'עור נקי וזוהר — הכיוון של Cloud Dancer 2026',
     trend_en: 'Clean luminous skin — the Cloud Dancer 2026 direction',
@@ -31,13 +51,20 @@ const LOCAL = {
   'soft-definition': {
     look_name_he: 'Soft Definition', look_name_en: 'Soft Definition', duration_minutes: 10,
     steps: [
-      { area: 'skin', technique: 'base', instruction_he: 'פאונדיישן בכיסוי בינוני, פודרה רק ב-T', instruction_en: 'Medium-coverage foundation, powder on the T-zone only', shade_hex: '#E3C3A8' },
-      { area: 'eyes', technique: 'shadow', instruction_he: 'צללית ניוד על כל העפעף', instruction_en: 'Nude shadow across the lid', shade_hex: '#8A6A55' },
-      { area: 'eyes', technique: 'liner', instruction_he: 'אייליינר חום דק בקו הריסים', instruction_en: 'A thin brown liner along the lash line', shade_hex: '#5A3E2E' },
-      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה שחורה, שתי שכבות', instruction_en: 'Black mascara, two coats', shade_hex: '#14110F' },
-      { area: 'cheeks', technique: 'blush', finish: 'satin', instruction_he: 'בלאש ורוד על תפוח הלחי', instruction_en: 'Pink blush on the apple of the cheek', shade_hex: '#D98F9E' },
-      { area: 'highlight', technique: 'highlight', finish: 'shimmer', instruction_he: 'היילייטר עדין על עצם הלחי', instruction_en: 'A soft highlighter along the cheekbone', shade_hex: '#F3DCC4' },
-      { area: 'lips', technique: 'lipstick', finish: 'matte', instruction_he: 'ורוד-חום מאט', instruction_en: 'Matte rose-brown', shade_hex: '#A9695E' },
+      { area: 'skin', technique: 'base', instruction_he: 'פאונדיישן בכיסוי בינוני, פודרה רק ב-T', instruction_en: 'Medium-coverage foundation, powder on the T-zone only', shade_hex: '#E3C3A8',
+        ref: 'NARS Light Reflecting Foundation', alt: 'L’Oréal Infaillible 24H Fresh Wear' },
+      { area: 'eyes', technique: 'shadow', instruction_he: 'צללית ניוד על כל העפעף', instruction_en: 'Nude shadow across the lid', shade_hex: '#8A6A55',
+        ref: 'Urban Decay Naked2 Basics · Frisk', alt: 'Catrice The Nude Blossom Palette' },
+      { area: 'eyes', technique: 'liner', instruction_he: 'אייליינר חום דק בקו הריסים', instruction_en: 'A thin brown liner along the lash line', shade_hex: '#5A3E2E',
+        ref: 'Bobbi Brown Long-Wear Gel Liner · Sepia Ink', alt: 'NYX Epic Ink Liner · Brown' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה שחורה, שתי שכבות', instruction_en: 'Black mascara, two coats', shade_hex: '#14110F',
+        ref: 'Lancôme Hypnôse', alt: 'Maybelline Sky High' },
+      { area: 'cheeks', technique: 'blush', finish: 'satin', instruction_he: 'בלאש ורוד על תפוח הלחי', instruction_en: 'Pink blush on the apple of the cheek', shade_hex: '#D98F9E',
+        ref: 'NARS Blush · Orgasm', alt: 'Essence Satin Touch Blush' },
+      { area: 'highlight', technique: 'highlight', finish: 'shimmer', instruction_he: 'היילייטר עדין על עצם הלחי', instruction_en: 'A soft highlighter along the cheekbone', shade_hex: '#F3DCC4',
+        ref: 'Charlotte Tilbury Hollywood Flawless Filter', alt: 'Catrice Glow Lighter' },
+      { area: 'lips', technique: 'lipstick', finish: 'matte', instruction_he: 'ורוד-חום מאט', instruction_en: 'Matte rose-brown', shade_hex: '#A9695E',
+        ref: 'Charlotte Tilbury Matte Revolution · Pillow Talk Medium', alt: 'NYX Soft Matte Lip Cream · Cannes' },
     ],
     trend_he: 'הגדרה רכה — מספיק למצלמה, לא יותר מדי לפגישה',
     trend_en: 'Soft definition — enough for camera, not too much for a meeting',
@@ -47,13 +74,20 @@ const LOCAL = {
   'soft-evening': {
     look_name_he: 'Soft Evening', look_name_en: 'Soft Evening', duration_minutes: 18,
     steps: [
-      { area: 'skin', technique: 'base', instruction_he: 'כיסוי בינוני-מלא עם גימור סטין', instruction_en: 'Medium-to-full coverage with a satin finish', shade_hex: '#DFBB9F' },
-      { area: 'eyes', technique: 'shadow', instruction_he: 'צלליות חמות בקמט', instruction_en: 'Warm shadow through the crease', shade_hex: '#6B4536' },
-      { area: 'eyes', technique: 'liner', instruction_he: 'אייליינר מרוח בכוונה (smudged)', instruction_en: 'Deliberately smudged liner', shade_hex: '#2A1E18' },
-      { area: 'eyes', technique: 'lashes', instruction_he: 'ריסים — שכבה כפולה או ריסי פינה', instruction_en: 'Lashes — double coat or corner lashes', shade_hex: '#14110F' },
-      { area: 'cheeks', technique: 'blush', instruction_he: 'בלאש חם על תפוח הלחי', instruction_en: 'A warm blush on the apple of the cheek', shade_hex: '#B57A63' },
-      { area: 'contour', technique: 'contour', instruction_he: 'קונטור עדין מתחת לעצם הלחי', instruction_en: 'A soft contour under the cheekbone', shade_hex: '#8A6249' },
-      { area: 'lips', technique: 'lipstick', finish: 'satin', instruction_he: 'חום-אדמדם או רוז׳ עמוק', instruction_en: 'Red-brown or a deep rose', shade_hex: '#8E4438' },
+      { area: 'skin', technique: 'base', instruction_he: 'כיסוי בינוני-מלא עם גימור סטין', instruction_en: 'Medium-to-full coverage with a satin finish', shade_hex: '#DFBB9F',
+        ref: 'Estée Lauder Double Wear', alt: 'Maybelline SuperStay 30H' },
+      { area: 'eyes', technique: 'shadow', instruction_he: 'צלליות חמות בקמט', instruction_en: 'Warm shadow through the crease', shade_hex: '#6B4536',
+        ref: 'Anastasia Beverly Hills Soft Glam · Cyprus Umber', alt: 'Essence The Brown Edition Palette' },
+      { area: 'eyes', technique: 'liner', instruction_he: 'אייליינר מרוח בכוונה (smudged)', instruction_en: 'Deliberately smudged liner', shade_hex: '#2A1E18',
+        ref: 'Urban Decay 24/7 Glide-On · Perversion', alt: 'Rimmel Scandaleyes Kohl Kajal' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'ריסים — שכבה כפולה או ריסי פינה', instruction_en: 'Lashes — double coat or corner lashes', shade_hex: '#14110F',
+        ref: 'Too Faced Better Than Sex', alt: 'Maybelline Lash Sensational Sky High' },
+      { area: 'cheeks', technique: 'blush', instruction_he: 'בלאש חם על תפוח הלחי', instruction_en: 'A warm blush on the apple of the cheek', shade_hex: '#B57A63',
+        ref: 'NARS Blush · Dolce Vita', alt: 'Milani Baked Blush · Luminoso' },
+      { area: 'contour', technique: 'contour', instruction_he: 'קונטור עדין מתחת לעצם הלחי', instruction_en: 'A soft contour under the cheekbone', shade_hex: '#8A6249',
+        ref: 'Fenty Beauty Match Stix Matte · Amber', alt: 'Catrice Contouring Powder Stick' },
+      { area: 'lips', technique: 'lipstick', finish: 'satin', instruction_he: 'חום-אדמדם או רוז׳ עמוק', instruction_en: 'Red-brown or a deep rose', shade_hex: '#8E4438',
+        ref: 'MAC Satin Lipstick · Paramount', alt: 'Revlon Super Lustrous · Blase Apricot' },
     ],
     trend_he: 'Deliberate Imperfection — הכיוון המרכזי של F/W 26-27',
     trend_en: 'Deliberate imperfection — the defining mood of F/W 26-27',
@@ -63,30 +97,208 @@ const LOCAL = {
   statement: {
     look_name_he: 'Statement', look_name_en: 'Statement', duration_minutes: 25,
     steps: [
-      { area: 'skin', technique: 'base', instruction_he: 'כיסוי מלא, מקובע בפודרה ובספריי', instruction_en: 'Full coverage, set with powder and spray', shade_hex: '#DDB89B' },
-      { area: 'lips', technique: 'lipstick', finish: 'satin', instruction_he: 'Oxblood — אדום עמוק עם אנדרטון חום-סגול. עיפרון בקו ואז מילוי.', instruction_en: 'Oxblood — deep red with a brown-purple undertone. Line first, then fill.', shade_hex: '#6E1F28' },
-      { area: 'eyes', technique: 'shadow', instruction_he: 'כאן בוחרים אחד: אם השפה כהה — העין נשארת שקטה (ניוד + מסקרה).', instruction_en: 'Pick one: with a dark lip the eye stays quiet — nude shadow and mascara.', shade_hex: '#9C8574' },
-      { area: 'contour', technique: 'contour', instruction_he: 'קונטור מתחת לעצם הלחי', instruction_en: 'Contour under the cheekbone', shade_hex: '#8C6046' },
-      { area: 'highlight', technique: 'highlight', finish: 'shimmer', instruction_he: 'היילייטר קוסמי רב-גוני על עצם הלחי', instruction_en: 'A multi-tonal cosmic highlighter on the bone', shade_hex: '#C6A667' },
-      { area: 'brows', technique: 'brow', instruction_he: 'גבות מלאות ומוגדרות', instruction_en: 'Full, defined brows', shade_hex: '#4A3228' },
+      { area: 'skin', technique: 'base', instruction_he: 'כיסוי מלא, מקובע בפודרה ובספריי', instruction_en: 'Full coverage, set with powder and spray', shade_hex: '#DDB89B',
+        ref: 'Estée Lauder Double Wear + Laura Mercier Translucent Powder', alt: 'Maybelline SuperStay 30H + Rimmel Stay Matte' },
+      { area: 'lips', technique: 'lipstick', finish: 'satin', instruction_he: 'Oxblood — אדום עמוק עם אנדרטון חום-סגול. עיפרון בקו ואז מילוי.', instruction_en: 'Oxblood — deep red with a brown-purple undertone. Line first, then fill.', shade_hex: '#6E1F28',
+        ref: 'MAC Matte Lipstick · Sin', alt: 'Maybelline SuperStay Matte Ink · Voyager' },
+      { area: 'eyes', technique: 'shadow', instruction_he: 'כאן בוחרים אחד: אם השפה כהה — העין נשארת שקטה (ניוד + מסקרה).', instruction_en: 'Pick one: with a dark lip the eye stays quiet — nude shadow and mascara.', shade_hex: '#9C8574',
+        ref: 'Urban Decay Naked2 Basics · Tempted', alt: 'Catrice The Nude Blossom Palette' },
+      { area: 'contour', technique: 'contour', instruction_he: 'קונטור מתחת לעצם הלחי', instruction_en: 'Contour under the cheekbone', shade_hex: '#8C6046',
+        ref: 'Charlotte Tilbury Filmstar Bronze & Glow', alt: 'Milani Contour Palette' },
+      { area: 'highlight', technique: 'highlight', finish: 'shimmer', instruction_he: 'היילייטר קוסמי רב-גוני על עצם הלחי', instruction_en: 'A multi-tonal cosmic highlighter on the bone', shade_hex: '#C6A667',
+        ref: 'Fenty Beauty Killawatt · Mo’ Hunny', alt: 'Essence Glow Like Highlighter' },
+      { area: 'brows', technique: 'brow', instruction_he: 'גבות מלאות ומוגדרות', instruction_en: 'Full, defined brows', shade_hex: '#4A3228',
+        ref: 'Anastasia Beverly Hills Brow Wiz · Medium Brown', alt: 'Essence Eyebrow Pencil' },
     ],
     trend_he: 'Oxblood Lip — סיפור השפתיים של העונה (Saint Laurent, Elie Saab, Carven)',
-    trend_en: 'The oxblood lip — the season\'s lip story (Saint Laurent, Elie Saab, Carven)',
+    trend_en: 'The oxblood lip — the season’s lip story (Saint Laurent, Elie Saab, Carven)',
     tip_he: 'עין דרמטית או שפה דרמטית — לא שתיהן.',
     tip_en: 'Dramatic eye or dramatic lip — never both.',
+  },
+  'red-carpet': {
+    look_name_he: 'Classic Red', look_name_en: 'Classic Red', duration_minutes: 22,
+    steps: [
+      { area: 'skin', technique: 'base', instruction_he: 'כיסוי מלא בגימור סטין — אדום דורש עור אחיד', instruction_en: 'Full coverage in a satin finish — a red lip asks for even skin', shade_hex: '#E0BC9E',
+        ref: 'Estée Lauder Double Wear', alt: 'L’Oréal Infaillible 32H Matte Cover' },
+      { area: 'lips', technique: 'lipstick', finish: 'matte', instruction_he: 'אדום כחלחל מאט — עיפרון באותו גוון קודם, ואז מילוי מהמרכז החוצה', instruction_en: 'A true blue-red matte — line in the same shade first, then fill from the centre out', shade_hex: '#B3122B',
+        ref: 'MAC Retro Matte · Ruby Woo', alt: 'Maybelline SuperStay Matte Ink · Pioneer' },
+      { area: 'eyes', technique: 'liner', instruction_he: 'קו דק ונקי בלבד — האדום עושה את העבודה', instruction_en: 'A thin clean line only — the red is doing the work', shade_hex: '#14110F',
+        ref: 'Stila Stay All Day Liquid Liner · Intense Black', alt: 'NYX Epic Ink Liner' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה שחורה, שתי שכבות', instruction_en: 'Black mascara, two coats', shade_hex: '#14110F',
+        ref: 'Lancôme Hypnôse', alt: 'Essence Lash Princess' },
+      { area: 'cheeks', technique: 'blush', instruction_he: 'בלאש קריר ומינימלי — לא להתחרות בשפה', instruction_en: 'A cool, minimal blush — nothing that competes with the lip', shade_hex: '#C98494',
+        ref: 'NARS Blush · Dolce Vita', alt: 'Essence Satin Touch Blush' },
+      { area: 'brows', technique: 'brow', instruction_he: 'גבות מסודרות ולא כהות מדי', instruction_en: 'Groomed brows, not too dark', shade_hex: '#4A3228',
+        ref: 'Benefit Precisely My Brow', alt: 'Essence Eyebrow Pencil' },
+    ],
+    trend_he: 'האדום הקלאסי חוזר נקי — בלי גלוס, בלי ניצנוץ',
+    trend_en: 'The classic red returns clean — no gloss, no shimmer',
+    tip_he: 'לנגב את פנים השפה בטישו — זה מה שמונע אדום על השיניים.',
+    tip_en: 'Blot the inside of the lip on a tissue — that is what keeps red off the teeth.',
+  },
+  'berry-bold': {
+    look_name_he: 'Berry Bold', look_name_en: 'Berry Bold', duration_minutes: 20,
+    steps: [
+      { area: 'skin', technique: 'base', instruction_he: 'כיסוי בינוני, גימור טרי', instruction_en: 'Medium coverage, fresh finish', shade_hex: '#E2C0A4',
+        ref: 'NARS Light Reflecting Foundation', alt: 'Maybelline Fit Me Dewy + Smooth' },
+      { area: 'lips', technique: 'lipstick', finish: 'satin', instruction_he: 'פוקסיה-פטל רווי, קו נקי', instruction_en: 'A saturated raspberry fuchsia, cleanly lined', shade_hex: '#B3286B',
+        ref: 'YSL Rouge Pur Couture · 27 Fuchsia Innocent', alt: 'NYX Soft Matte Lip Cream · Prague' },
+      { area: 'eyes', technique: 'shadow', instruction_he: 'ניוד חמים בלבד — הפה הוא הצבע', instruction_en: 'Warm nude only — the mouth is the colour', shade_hex: '#A8846C',
+        ref: 'Urban Decay Naked3 · Nooner', alt: 'Catrice The Dry Rosé Palette' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה שחורה', instruction_en: 'Black mascara', shade_hex: '#14110F',
+        ref: 'Benefit They’re Real Magnet', alt: 'Maybelline Sky High' },
+      { area: 'cheeks', technique: 'blush', finish: 'satin', instruction_he: 'בלאש פטל מטושטש גבוה על הלחי', instruction_en: 'A raspberry blush blurred high on the cheek', shade_hex: '#C4547E',
+        ref: 'Rare Beauty Soft Pinch Liquid Blush · Grace', alt: 'Milani Cheek Kiss · Berry Bliss' },
+      { area: 'brows', technique: 'brow', instruction_he: 'גבות טבעיות, מסורקות מעלה', instruction_en: 'Natural brows, brushed up', shade_hex: '#5A4133',
+        ref: 'Anastasia Beverly Hills Brow Freeze', alt: 'Essence Make Me Brow' },
+    ],
+    trend_he: 'צבע רווי על הפה עם עין נקייה — הדרך הקלה ביותר להיראות מכוונת',
+    trend_en: 'Saturated colour on the mouth with a clean eye — the easiest way to look deliberate',
+    tip_he: 'פוקסיה מבליט שיניים לבנות — לבחור גוון עם אנדרטון כחול ולא כתום.',
+    tip_en: 'Fuchsia flatters the teeth when the undertone is blue rather than orange.',
+  },
+  'copper-glow': {
+    look_name_he: 'Copper Glow', look_name_en: 'Copper Glow', duration_minutes: 20,
+    steps: [
+      { area: 'skin', technique: 'base', finish: 'shimmer', instruction_he: 'בסיס זוהר, לא מאט', instruction_en: 'A luminous base, never matte', shade_hex: '#E4C0A0',
+        ref: 'Charlotte Tilbury Beautiful Skin Foundation', alt: 'L’Oréal Lumi Glotion + Fit Me Dewy' },
+      { area: 'eyes', technique: 'shadow', finish: 'shimmer', instruction_he: 'נחושת מטאלית על כל העפעף הנייד, מטושטשת בקמט', instruction_en: 'Metallic copper across the mobile lid, blurred into the crease', shade_hex: '#B26A3C',
+        ref: 'Natasha Denona Bronze Palette', alt: 'Catrice Metal Shock Eyeshadow · Copper' },
+      { area: 'eyes', technique: 'liner', instruction_he: 'קו חום-נחושת בקו הריסים, מרוח קלות', instruction_en: 'A copper-brown line at the lashes, lightly smudged', shade_hex: '#7A4423',
+        ref: 'Urban Decay 24/7 Glide-On · Smog', alt: 'NYX Epic Wear Liner Stick · Copper' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה חומה-שחורה', instruction_en: 'Brown-black mascara', shade_hex: '#241A14',
+        ref: 'Benefit They’re Real · Beyond Brown', alt: 'L’Oréal Telescopic · Brown' },
+      { area: 'cheeks', technique: 'blush', instruction_he: 'בלאש אפרסק-נחושת', instruction_en: 'Peach-copper blush', shade_hex: '#CE8258',
+        ref: 'NARS Blush · Luster', alt: 'Milani Baked Blush · Luminoso' },
+      { area: 'highlight', technique: 'highlight', finish: 'shimmer', instruction_he: 'היילייטר זהוב-שמפניה על נקודות הגובה', instruction_en: 'A champagne-gold highlighter on the high points', shade_hex: '#E8C98F',
+        ref: 'Fenty Beauty Killawatt · Trophy Wife', alt: 'Essence Glow Like Highlighter' },
+      { area: 'lips', technique: 'lipstick', finish: 'glossy', instruction_he: 'גלוס קרמל שקוף', instruction_en: 'A sheer caramel gloss', shade_hex: '#B9755C',
+        ref: 'Fenty Beauty Gloss Bomb · Fenty Glow', alt: 'Maybelline Lifter Gloss · Topaz' },
+    ],
+    trend_he: 'עין נחושת על עור זוהר — הכיוון החם של F/W 26-27',
+    trend_en: 'A copper eye on luminous skin — the warm direction of F/W 26-27',
+    tip_he: 'נחושת עובדת יפה במיוחד על עיניים ירוקות וחומות — היא הצבע המשלים שלהן.',
+    tip_en: 'Copper flatters green and brown eyes especially — it is their complementary.',
+  },
+  'cobalt-liner': {
+    look_name_he: 'Cobalt Liner', look_name_en: 'Cobalt Liner', duration_minutes: 16,
+    steps: [
+      { area: 'skin', technique: 'base', instruction_he: 'בסיס נקי ומאוזן — הצבע כולו בעין', instruction_en: 'A clean even base — all the colour is at the eye', shade_hex: '#E3C3A8',
+        ref: 'NARS Light Reflecting Foundation', alt: 'Maybelline Fit Me Matte + Poreless' },
+      { area: 'eyes', technique: 'liner', instruction_he: 'קו קובלט גרפי לאורך קו הריסים העליון, עם מתיחה קצרה', instruction_en: 'A graphic cobalt line along the upper lash line with a short wing', shade_hex: '#1F4FD8',
+        ref: 'NYX Vivid Brights Liner · Vivid Sapphire', alt: 'Essence Colour Kick Eyeliner · Blue' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה שחורה בלבד — בלי צללית', instruction_en: 'Black mascara only — no shadow', shade_hex: '#14110F',
+        ref: 'Maybelline Sky High', alt: 'Essence Lash Princess' },
+      { area: 'brows', technique: 'brow', instruction_he: 'גבות מוגדרות, מסורקות מעלה', instruction_en: 'Defined brows, brushed up', shade_hex: '#4A3228',
+        ref: 'Anastasia Beverly Hills Brow Wiz', alt: 'Essence Eyebrow Pencil' },
+      { area: 'cheeks', technique: 'blush', instruction_he: 'בלאש אפרסק שקט', instruction_en: 'A quiet peach blush', shade_hex: '#DDA083',
+        ref: 'Rare Beauty Soft Pinch · Joy', alt: 'Catrice Blush Box' },
+      { area: 'lips', technique: 'lipstick', finish: 'satin', instruction_he: 'ניוד-ורדרד — הכל נשאר בעין', instruction_en: 'A rosy nude — everything stays at the eye', shade_hex: '#C08A80',
+        ref: 'Charlotte Tilbury Matte Revolution · Pillow Talk', alt: 'Revlon Super Lustrous · Pink Truffle' },
+    ],
+    trend_he: 'צבע על קו הריסים במקום צללית — הגרסה הלבישה של הטרנד הגרפי',
+    trend_en: 'Colour at the lash line instead of shadow — the wearable version of the graphic trend',
+    tip_he: 'קו צבעוני דורש עין נקייה לגמרי מסביב, אחרת הוא נראה מלוכלך.',
+    tip_en: 'A coloured line needs a completely clean eye around it, or it reads as smudged.',
+  },
+  'green-smoke': {
+    look_name_he: 'Green Smoke', look_name_en: 'Green Smoke', duration_minutes: 26,
+    steps: [
+      { area: 'skin', technique: 'base', instruction_he: 'כיסוי בינוני-מלא, גימור סטין', instruction_en: 'Medium-to-full coverage, satin finish', shade_hex: '#DFBB9F',
+        ref: 'Estée Lauder Double Wear', alt: 'L’Oréal Infaillible 24H Fresh Wear' },
+      { area: 'eyes', technique: 'shadow', instruction_he: 'ירוק אזוב עמוק על העפעף, מטושטש כלפי מעלה ולחוץ', instruction_en: 'A deep moss green on the lid, blurred up and outward', shade_hex: '#3F5B3A',
+        ref: 'MAC Eye Shadow · Humid', alt: 'Catrice The Ultimate Green Palette' },
+      { area: 'eyes', technique: 'liner', instruction_he: 'קו ירוק כהה בתוך קו הריסים, מרוח', instruction_en: 'A dark green line tight to the lashes, smudged', shade_hex: '#26402A',
+        ref: 'Urban Decay 24/7 Glide-On · Mildew', alt: 'NYX Epic Wear Liner Stick · Emerald Cut' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה שחורה, שתי שכבות', instruction_en: 'Black mascara, two coats', shade_hex: '#14110F',
+        ref: 'Too Faced Better Than Sex', alt: 'Maybelline Lash Sensational' },
+      { area: 'cheeks', technique: 'blush', instruction_he: 'בלאש חום-ורדרד, מינימלי', instruction_en: 'A rosy-brown blush, minimal', shade_hex: '#B5786A',
+        ref: 'NARS Blush · Dolce Vita', alt: 'Milani Baked Blush · Dolce Pink' },
+      { area: 'lips', technique: 'lipstick', finish: 'matte', instruction_he: 'ניוד חום — עין ירוקה עמוקה לא רוצה תחרות', instruction_en: 'A brown nude — a deep green eye wants no competition', shade_hex: '#A2705E',
+        ref: 'MAC Matte Lipstick · Velvet Teddy', alt: 'NYX Soft Matte Lip Cream · Stockholm' },
+    ],
+    trend_he: 'ירוק במקום שחור — עשן בצבע הוא סיפור העין של העונה',
+    trend_en: 'Green instead of black — coloured smoke is the season’s eye story',
+    tip_he: 'ירוק בולט במיוחד על עיניים חומות ואגוזיות.',
+    tip_en: 'Green sings against brown and hazel eyes.',
+  },
+  'lilac-wash': {
+    look_name_he: 'Lilac Wash', look_name_en: 'Lilac Wash', duration_minutes: 14,
+    steps: [
+      { area: 'skin', technique: 'base', instruction_he: 'בסיס קל וזוהר', instruction_en: 'A light luminous base', shade_hex: '#E6C6AC',
+        ref: 'Glossier Perfecting Skin Tint', alt: 'Maybelline Fit Me Fresh Tint' },
+      { area: 'eyes', technique: 'shadow', instruction_he: 'שטיפת לילך על כל העפעף, בלי קו קמט', instruction_en: 'A lilac wash across the whole lid, no crease line', shade_hex: '#A98BC4',
+        ref: 'NARS Single Eyeshadow · Bagatelle', alt: 'Essence The Purple Edition Palette' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה שחורה, שכבה אחת', instruction_en: 'Black mascara, one coat', shade_hex: '#14110F',
+        ref: 'Benefit They’re Real', alt: 'Essence Lash Princess' },
+      { area: 'cheeks', technique: 'blush', finish: 'satin', instruction_he: 'בלאש ורוד קריר', instruction_en: 'A cool pink blush', shade_hex: '#D392A6',
+        ref: 'Rare Beauty Soft Pinch · Bliss', alt: 'Catrice Blush Box · Cool Berry' },
+      { area: 'lips', technique: 'lipstick', finish: 'glossy', instruction_he: 'גלוס ורוד שקוף', instruction_en: 'A sheer pink gloss', shade_hex: '#CE8FA0',
+        ref: 'Dior Addict Lip Maximizer · 010 Holo Pink', alt: 'Maybelline Lifter Gloss · Ice' },
+      { area: 'brows', technique: 'brow', instruction_he: 'גבות רכות, לא כהות', instruction_en: 'Soft brows, nothing heavy', shade_hex: '#6B4F3F',
+        ref: 'Benefit Gimme Brow+', alt: 'Essence Make Me Brow' },
+    ],
+    trend_he: 'פסטל רווי על העפעף — צבע בלי דרמה',
+    trend_en: 'A saturated pastel on the lid — colour without drama',
+    tip_he: 'לילך על עפעף עם אנדרטון ורדרד מדגיש אדמומיות — פריימר עפעפיים קודם.',
+    tip_en: 'Lilac over a pink-toned lid emphasises redness — prime the lid first.',
+  },
+  'coral-fresh': {
+    look_name_he: 'Coral Fresh', look_name_en: 'Coral Fresh', duration_minutes: 12,
+    steps: [
+      { area: 'skin', technique: 'base', instruction_he: 'טינט קל — לוק של אור יום', instruction_en: 'A light tint — this is a daylight look', shade_hex: '#E8CBB4',
+        ref: 'Charlotte Tilbury Unreal Skin Sheer Glow Tint', alt: 'L’Oréal Lumi Glotion' },
+      { area: 'cheeks', technique: 'blush', instruction_he: 'קורל חי גבוה על הלחי, נמרח כלפי הרקה', instruction_en: 'A live coral high on the cheek, swept toward the temple', shade_hex: '#F0755A',
+        ref: 'NARS Blush · Exhibit A (sheered out)', alt: 'Milani Baked Blush · Luminoso' },
+      { area: 'lips', technique: 'lipstick', finish: 'satin', instruction_he: 'קורל-אפרסק על השפה', instruction_en: 'Coral-peach on the lip', shade_hex: '#E4694F',
+        ref: 'MAC Lipstick · Sushi Kiss', alt: 'Revlon Super Lustrous · Coral Berry' },
+      { area: 'eyes', technique: 'shadow', instruction_he: 'אפרסק בהיר על העפעף בלבד', instruction_en: 'A pale peach on the lid only', shade_hex: '#E0A98C',
+        ref: 'Urban Decay Naked3 · Strange', alt: 'Catrice The Coral Nude Palette' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'מסקרה חומה', instruction_en: 'Brown mascara', shade_hex: '#4A3228',
+        ref: 'L’Oréal Telescopic · Brown', alt: 'Essence Lash Princess · Brown' },
+    ],
+    trend_he: 'קורל חוזר — הצבע שהכי מחמיא לעור שזוף',
+    trend_en: 'Coral returns — the shade that flatters tanned skin most',
+    tip_he: 'אותו קורל על הלחי ועל השפה — זה מה שהופך אותו למכוון ולא מקרי.',
+    tip_en: 'The same coral on cheek and lip — that is what makes it read as deliberate.',
+  },
+  'graphic-noir': {
+    look_name_he: 'Graphic Noir', look_name_en: 'Graphic Noir', duration_minutes: 28,
+    steps: [
+      { area: 'skin', technique: 'base', instruction_he: 'עור אחיד לגמרי — גרפיקה דורשת רקע נקי', instruction_en: 'Completely even skin — graphic work needs a clean ground', shade_hex: '#DDB89B',
+        ref: 'Estée Lauder Double Wear', alt: 'L’Oréal Infaillible 32H Matte Cover' },
+      { area: 'eyes', technique: 'liner', instruction_he: 'קו כפול: קו ריסים חד ומתיחה שנייה מעל הקמט', instruction_en: 'A double line: a sharp lash line and a second wing above the crease', shade_hex: '#0E0C0C',
+        ref: 'Stila Stay All Day Liquid Liner · Intense Black', alt: 'NYX Epic Ink Liner' },
+      { area: 'eyes', technique: 'lashes', instruction_he: 'ריסים מלאים או ריסים מלאכותיים', instruction_en: 'Full lashes, or falsies', shade_hex: '#0E0C0C',
+        ref: 'Too Faced Better Than Sex + Ardell Wispies', alt: 'Maybelline Lash Sensational Sky High' },
+      { area: 'brows', technique: 'brow', instruction_he: 'גבות חזקות ומוגדרות', instruction_en: 'Strong, defined brows', shade_hex: '#3A2A20',
+        ref: 'Anastasia Beverly Hills Dipbrow Pomade', alt: 'Catrice Brow Definer' },
+      { area: 'lips', technique: 'lipstick', finish: 'matte', instruction_he: 'ניוד מאט — העין היא כל הסיפור', instruction_en: 'A matte nude — the eye is the entire story', shade_hex: '#B08476',
+        ref: 'MAC Matte Lipstick · Honeylove', alt: 'NYX Soft Matte Lip Cream · Stockholm' },
+      { area: 'highlight', technique: 'highlight', finish: 'shimmer', instruction_he: 'היילייטר קר על עצם הלחי', instruction_en: 'A cool highlighter on the cheekbone', shade_hex: '#EFE0D2',
+        ref: 'Fenty Beauty Killawatt · Lightning Dust', alt: 'Essence Glow Like Highlighter' },
+    ],
+    trend_he: 'Double Cat-Eye — הקו הגרפי של F/W 26-27',
+    trend_en: 'The double cat-eye — the graphic line of F/W 26-27',
+    tip_he: 'לצייר את שני הקווים בעיניים פקוחות, מול המראה בגובה העיניים.',
+    tip_en: 'Draw both lines with the eyes open, mirror at eye level.',
   },
   editorial: {
     look_name_he: 'Editorial', look_name_en: 'Editorial', duration_minutes: 35,
     steps: [
-      { area: 'eyes', technique: 'liner', instruction_he: 'Double cat-eye — שני קווים מקבילים, או מתפצלים לכיוונים שונים', instruction_en: 'Double cat-eye — two parallel wings, or two splitting in different directions', shade_hex: '#14110F' },
-      { area: 'eyes', technique: 'shadow', finish: 'shimmer', instruction_he: 'לחלופין: מונוכרום — צבע רווי אחד על עפעף, לחי ושפה', instruction_en: 'Alternatively: monochrome — one saturated colour across lid, cheek and lip', shade_hex: '#B9A3C4' },
-      { area: 'skin', technique: 'base', finish: 'shimmer', instruction_he: 'עור זוהר עם ברק רב-גוני על נקודות הגובה', instruction_en: 'Luminous skin with multi-tonal shine on the high points', shade_hex: '#E8D5C0' },
-      { area: 'lips', technique: 'lipstick', finish: 'glossy', instruction_he: 'לפי הקונספט — או שקוף לגמרי או רווי לגמרי', instruction_en: 'By concept — either fully sheer or fully saturated', shade_hex: '#C2317C' },
+      { area: 'eyes', technique: 'liner', instruction_he: 'Double cat-eye — שני קווים מקבילים, או מתפצלים לכיוונים שונים', instruction_en: 'Double cat-eye — two parallel wings, or two splitting in different directions', shade_hex: '#14110F',
+        ref: 'Stila Stay All Day Liquid Liner', alt: 'NYX Epic Ink Liner' },
+      { area: 'eyes', technique: 'shadow', finish: 'shimmer', instruction_he: 'לחלופין: מונוכרום — צבע רווי אחד על עפעף, לחי ושפה', instruction_en: 'Alternatively: monochrome — one saturated colour across lid, cheek and lip', shade_hex: '#B9A3C4',
+        ref: 'NARS Single Eyeshadow · Bagatelle', alt: 'Essence The Purple Edition Palette' },
+      { area: 'skin', technique: 'base', finish: 'shimmer', instruction_he: 'עור זוהר עם ברק רב-גוני על נקודות הגובה', instruction_en: 'Luminous skin with multi-tonal shine on the high points', shade_hex: '#E8D5C0',
+        ref: 'Charlotte Tilbury Hollywood Flawless Filter', alt: 'L’Oréal Lumi Glotion' },
+      { area: 'lips', technique: 'lipstick', finish: 'glossy', instruction_he: 'לפי הקונספט — או שקוף לגמרי או רווי לגמרי', instruction_en: 'By concept — either fully sheer or fully saturated', shade_hex: '#C2317C',
+        ref: 'Fenty Beauty Stunna Lip Paint · Unlocked', alt: 'NYX Soft Matte Lip Cream · Prague' },
     ],
     trend_he: 'Double Cat-Eye · Monochromatic Face · Cosmic Highlighter',
     trend_en: 'Double cat-eye · monochromatic face · cosmic highlighter',
-    tip_he: 'לצלם קודם — לוק אדיטוריאלי נראה אחרת במצלמה מאשר במראה.',
-    tip_en: 'Photograph it first — an editorial look reads differently on camera than in the mirror.',
+    tip_he: 'לוק עורכי דורש עור מוכן — זה השלב שאסור לדלג עליו.',
+    tip_en: 'An editorial look rests on prepared skin — that is the step never to skip.',
   },
   grooming: {
     look_name_he: 'Grooming', look_name_en: 'Grooming', duration_minutes: 12,
@@ -230,14 +442,42 @@ export function renderBeauty(root, ctx) {
               pick(s, 'shade') || pick(s, 'product_type')
                 ? el('div', { class: 'slot-why', text: [pick(s, 'product_type'), pick(s, 'shade')].filter(Boolean).join(' · ') })
                 : null,
+              // The shopping list. A hex tells the simulation what to paint; a
+              // name is what you can actually ask for at a counter, and it is
+              // how the trade talks about a shade in the first place.
+              s.ref ? el('div', { class: 'slot-why', style: { marginTop: '3px' } },
+                el('b', { style: { color: 'var(--ink-2)' }, text: s.ref }),
+                s.alt ? el('span', { text: ` · ${t('step_alt')}: ${s.alt}` }) : null,
+              ) : null,
             ),
           ))),
+        steps.some(x => x.ref) ? el('p', { class: 'micro muted', style: { marginTop: 'var(--s3)' },
+          text: t('products_note') }) : null,
         pick(d, 'trend_note') ? el('div', { class: 'look-note' },
           el('span', { class: 'note-label', text: t('bt_trend') }),
           el('div', { class: 'tiny', text: pick(d, 'trend_note') })) : null,
         pick(d, 'longevity_tip') ? el('div', { class: 'look-note' },
           el('span', { class: 'note-label', text: t('bt_tip') }),
           el('div', { class: 'tiny', text: pick(d, 'longevity_tip') })) : null,
+
+        /* The brief belongs to the look, not to the simulation.
+           It used to live inside the simulation block, which only renders when
+           there is a usable face map — so a photo the detector could not read
+           took the makeup brief down with it, and the brief is the part that
+           actually produces a good picture. It needs the look and, at most, a
+           photograph; it never needed the region map. */
+        el('div', { class: 'stack g2', style: { marginTop: 'var(--s4)' } },
+          state.lastLook ? el('button', {
+            class: 'btn btn-primary btn-block btn-sm',
+            html: icon('sparkles') + `<span>${esc(t('brief_full_open'))}</span>`,
+            onclick: () => openFullBrief(state.lastLook, { makeup: d, intensity: 1 }),
+          }) : null,
+          el('button', {
+            class: state.lastLook ? 'btn btn-quiet btn-block btn-sm' : 'btn btn-primary btn-block btn-sm',
+            html: icon('sparkles') + `<span>${esc(t('brief_makeup_open'))}</span>`,
+            onclick: () => openMakeupBrief(d, { intensity: 1 }),
+          }),
+        ),
       ),
     ].filter(Boolean));
     observeReveal(host);
@@ -325,9 +565,8 @@ function simulationBlock(look, ctx) {
       intensityRange,
     ),
     el('p', { class: 'micro muted', style: { margin: 0 }, text: t('sim_disclaimer') }),
-    // With an outfit already built, the two briefs are one job: the same
-    // photograph, the same person, one set of instructions. Splitting them
-    // means running the render twice and getting two different people back.
+    // The same two briefs as under the look, but carrying the intensity the
+    // slider is actually showing.
     state.lastLook ? el('button', {
       class: 'btn btn-primary btn-block btn-sm',
       html: icon('sparkles') + `<span>${esc(t('brief_full_open'))}</span>`,
@@ -336,7 +575,7 @@ function simulationBlock(look, ctx) {
     el('button', {
       class: state.lastLook ? 'btn btn-quiet btn-block btn-sm' : 'btn btn-ghost btn-block btn-sm',
       style: state.lastLook ? { marginTop: 'var(--s2)' } : null,
-      html: icon('sparkles') + `<span>${esc(t('brief_open'))}</span>`,
+      html: icon('sparkles') + `<span>${esc(t('brief_makeup_open'))}</span>`,
       onclick: () => openMakeupBrief(look, { intensity: intensityForBrief() }),
     }),
     // The detector places the anchors well or says it cannot. It has no way to
@@ -409,6 +648,7 @@ function localLook(key) {
       instruction_he: s.instruction_he, instruction_en: s.instruction_en,
       product_type_he: '', product_type_en: '',
       shade_he: '', shade_en: '', shade_hex: s.shade_hex,
+      ref: s.ref || null, alt: s.alt || null,
     })),
     trend_note_he: src.trend_he, trend_note_en: src.trend_en,
     longevity_tip_he: src.tip_he, longevity_tip_en: src.tip_en,
