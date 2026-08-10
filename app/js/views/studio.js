@@ -8,7 +8,7 @@ import { state, refreshLooks, itemById } from '../state.js';
 import { Looks, newId, hasKey } from '../store.js';
 import { buildLook, pairWithItem, errText } from '../ai.js';
 import { buildLookLocal, pairWithItemLocal } from '../stylist.js';
-import { renderTryOn, renderLookbook, downloadCanvas } from '../tryon.js';
+import { renderLookbook, downloadCanvas } from '../tryon.js';
 import { loadImage } from '../makeup.js';
 import { OCCASIONS, TIMES, WEATHER, MOODS, occName, catIcon, lbl, formalityName } from '../taxonomy.js';
 import { renderLookCard } from './lookcard.js';
@@ -249,28 +249,19 @@ export function tryOnBlock(look, ctx) {
     );
   }
 
-  const before = el('img', { src: rec.photo, alt: '' });
-  const canvas = el('canvas', { 'aria-label': t('tryon_title') });
-  const stage = el('div', { class: 'sim-stage' },
-    before,
-    canvas,
-    el('span', { class: 'sim-tag sim-tag-a', text: t('tryon_title') }),
-    el('span', { class: 'sim-divider' }),
-    el('input', {
-      class: 'sim-range', type: 'range', min: '0', max: '100', value: '62',
-      'aria-label': t('tryon_title'),
-      oninput: (e) => stage.style.setProperty('--split', e.target.value + '%'),
-    }),
-  );
+  /* The canvas try-on is gone from this screen.
+     Painting garments onto a photograph is a much harder problem than painting
+     makeup onto one: makeup modulates pixels that are already there, and a
+     dress has to be re-cut, re-draped and re-lit for a body it was never
+     photographed on. The canvas could only ever put flat shapes roughly where
+     the clothes go, and the result was bad enough to make the whole look look
+     bad. What actually produces a photograph of this outfit on this person is
+     the render brief, so that is what this screen offers now.
 
-  let opacity = 0.85;
+     The body photo is still loaded — the lookbook card is built from it, and
+     that one is worth keeping. */
   let photoEl = null;
-
-  async function draw() {
-    photoEl ||= await loadImage(rec.photo);
-    await renderTryOn(canvas, photoEl, rec.regions, items, { opacity });
-  }
-  draw().catch(() => toast(t('err_generic'), 'warn'));
+  loadImage(rec.photo).then((img) => { photoEl = img; }).catch(() => {});
 
   const fit = rec.body;
   const fitCard = fit ? el('section', { class: 'card' },
@@ -325,16 +316,12 @@ export function tryOnBlock(look, ctx) {
         },
       }),
     ),
-    stage,
-    el('div', {},
-      el('div', { class: 'label', text: t('tryon_opacity') }),
-      el('input', {
-        class: 'slider', type: 'range', min: '30', max: '100', value: '85',
-        'aria-label': t('tryon_opacity'),
-        oninput: (e) => { opacity = +e.target.value / 100; draw(); },
-      }),
+    el('div', { class: 'card stack g3' },
+      el('img', { src: rec.photo, alt: '', loading: 'lazy',
+        style: { width: '100%', maxHeight: '360px', objectFit: 'contain',
+                 borderRadius: 'var(--r-sm)', background: 'var(--cloud-3)' } }),
+      el('p', { class: 'tiny muted', style: { margin: 0 }, text: t('tryon_render_note') }),
     ),
-    el('p', { class: 'micro muted', style: { margin: 0 }, text: t('tryon_disclaimer') }),
     fitCard,
   );
 }

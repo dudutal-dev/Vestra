@@ -128,7 +128,11 @@ export function renderStrip(look, { onChange } = {}) {
   const paint = () => {
     const current = state.looks.find(l => l.id === look?.id) || look;
     const list = current?.renders || [];
-    host.replaceChildren(
+    /* Filtered, not passed straight through. `el` drops a null child, so the
+       same expression is harmless there — but `replaceChildren` is a DOM method
+       and stringifies anything that is not a Node. Every look without a render
+       yet was printing the word "null" above its add button. */
+    host.replaceChildren(...[
       list.length ? el('div', { class: 'row g2 wrap' },
         list.map((r, i) => el('button', {
           class: 'card card-lift',
@@ -149,7 +153,7 @@ export function renderStrip(look, { onChange } = {}) {
           if (rec) { Object.assign(look, rec); paint(); onChange?.(rec); }
         },
       }),
-    );
+    ].filter(Boolean));
   };
 
   paint();

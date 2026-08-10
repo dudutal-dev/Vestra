@@ -175,6 +175,7 @@ export const DICT = {
     looks_none: 'עוד לא שמרת לוקים. כל לוק שתשמור — או כל תמונה שתוסיף — יופיע כאן.',
     looks_none_match: 'אין לוק שמור שמתאים לאירוע הזה.',
     looks_empty_tile: 'הפריטים נמחקו',
+    tryon_render_note: 'ההדמיה על הבד הוחלפה: להלביש בגד על גוף זה לא אותה בעיה כמו איפור, ומה שיצא לא היה טוב. הבריף למעלה מייצר תמונה אמיתית של הלוק הזה עליך.',
     looks_search_ph: 'חפש לוק — אירוע, פריט, צבע…',
     looks_none_found: 'לא נמצא לוק שמתאים לחיפוש.',
     looks_delete: 'מחק לוק', looks_delete_ask: 'למחוק את הלוק הזה מהמדף?',
@@ -276,8 +277,8 @@ export const DICT = {
     f_lip: 'שפתיים', f_apply: 'המלצת יישום',
 
     /* ---- try-on ---- */
-    tryon_title: 'הלוק עליך',
-    tryon_need_body: 'העלה תמונת גוף כדי לראות את הלוק עלייך',
+    tryon_title: 'התמונה שלך',
+    tryon_need_body: 'העלה תמונת גוף — היא נכנסת לכרטיס הלוקבוק ולבריף הרנדור',
     tryon_open_capture: 'העלה תמונת גוף',
     tryon_opacity: 'שקיפות הפריטים',
     tryon_disclaimer: 'תצוגה מקדימה: הפריטים ממוקמים על אזורי הגוף שזוהו. זו המחשה סטיילינגית, לא הדמייה פוטוריאליסטית.',
@@ -484,6 +485,7 @@ export const DICT = {
     looks_none: 'Nothing saved yet. Every look you save — and every photo you add — lands here.',
     looks_none_match: 'No saved look fits this occasion.',
     looks_empty_tile: 'Pieces deleted',
+    tryon_render_note: 'The canvas try-on is gone: dressing a body is not the same problem as makeup, and what it produced was not good enough. The brief above gets you a real photograph of this look on you.',
     looks_search_ph: 'Search looks — occasion, piece, colour…',
     looks_none_found: 'No saved look matches that search.',
     looks_delete: 'Delete look', looks_delete_ask: 'Remove this look from the shelf?',
@@ -583,8 +585,8 @@ export const DICT = {
     f_lip: 'Lips', f_apply: 'How to apply',
 
     /* ---- try-on ---- */
-    tryon_title: 'The look on you',
-    tryon_need_body: 'Upload a body photo to see the look on you',
+    tryon_title: 'Your photograph',
+    tryon_need_body: 'Upload a body photo — it goes into the lookbook card and the render brief',
     tryon_open_capture: 'Upload a body photo',
     tryon_opacity: 'Garment opacity',
     tryon_disclaimer: 'Preview: your pieces are placed over the detected body regions. This is a styling illustration, not a photorealistic render.',
