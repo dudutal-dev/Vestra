@@ -60,33 +60,55 @@ async function asFile(dataUrl, filename) {
 }
 
 /**
- * Hand the whole brief over at once — the instruction and the photographs it
- * refers to, in one share.
+ * Hand the brief over the way the phone will actually let you.
  *
- * Copying the text and saving the images separately works, but it puts the
- * assembly back on the owner: they paste, then find four files in their camera
- * roll, then attach them in the right order. The share sheet carries text and
- * files together, so the target app receives the brief already assembled.
+ * The obvious move is one share carrying the text and the photographs
+ * together, and on Android and desktop that is what happens. On iOS it fails
+ * in a way that looks like the feature is broken: the share sheet appears but
+ * the app you wanted is missing from it. iOS only offers a target that accepts
+ * *every* item in the payload, and a share extension that happily takes images
+ * will not take images plus a page of text — so the list empties out.
  *
- * Not every browser can share files, and some that claim to will silently drop
- * them, which is why `canShare` is asked about the actual payload rather than
- * about the feature.
+ * So the photographs go through the share sheet on their own, where every
+ * image-accepting app is offered, and the text goes to the clipboard in the
+ * same tap. The owner picks the app, the pictures arrive, and the brief is
+ * already waiting to be pasted.
+ *
+ * Two details make it work rather than nearly work. The files are built before
+ * the tap, because iOS treats the user gesture as spent once an await has
+ * resolved and refuses the share. And the clipboard write is started but not
+ * awaited, for the same reason — it lands during the gesture while `share` is
+ * still the thing being called from it.
  */
-async function shareBrief(text, photos) {
-  if (!navigator.share || !photos.length) return 'unsupported';
-  let files;
+async function sharePhotosAndCopy(text, files) {
+  if (!navigator.share || !files?.length) return 'unsupported';
+  const payload = { files };
+  if (navigator.canShare && !navigator.canShare(payload)) return 'unsupported';
+
+  let copied = true;
   try {
-    files = await Promise.all(photos.map(p => asFile(p.dataUrl, p.filename)));
+    navigator.clipboard?.writeText(text).catch(() => { copied = false; });
   } catch {
-    return 'unsupported';
+    copied = false;
   }
+
+  try {
+    await navigator.share(payload);
+    return copied ? 'shared' : 'shared-no-copy';
+  } catch (e) {
+    return e?.name === 'AbortError' ? 'cancelled' : 'unsupported';
+  }
+}
+
+/** Text and files in one share — right where the platform allows it. */
+async function shareEverything(text, files) {
+  if (!navigator.share || !files?.length) return 'unsupported';
   const payload = { text, files };
   if (navigator.canShare && !navigator.canShare(payload)) return 'unsupported';
   try {
     await navigator.share(payload);
     return 'shared';
   } catch (e) {
-    // A cancelled share sheet is not a failure — the owner changed their mind.
     return e?.name === 'AbortError' ? 'cancelled' : 'unsupported';
   }
 }
@@ -122,17 +144,44 @@ export function openBrief({ kind, prompt, photos = [] }) {
     },
   });
 
+  /* Built ahead of the tap. iOS counts the user gesture as spent once an await
+     has resolved, so turning six data URLs into Files inside the click handler
+     is enough to make `share` throw — the sheet simply never opens. */
+  let files = null;
+  if (photos.length && navigator.share) {
+    Promise.all(photos.map(p => asFile(p.dataUrl, p.filename)))
+      .then(f => { files = f; })
+      .catch(() => { files = null; });
+  }
+
+  const shareResult = (res) => {
+    if (res === 'shared') { buzz(14); toast(t('brief_share_done')); return; }
+    if (res === 'shared-no-copy') { buzz(14); toast(t('brief_share_nocopy'), 'warn'); return; }
+    if (res === 'cancelled') return;
+    toast(t('brief_share_no'), 'warn');
+  };
+
   const shareBtn = photos.length && navigator.share ? el('button', {
     class: 'btn btn-primary btn-block',
     html: icon('upload') + `<span>${esc(t('brief_share'))}</span>`,
     onclick: async (e) => {
       const btn = e.currentTarget;
       btn.disabled = true;
-      const res = await shareBrief(prompt, photos);
+      shareResult(await sharePhotosAndCopy(prompt, files));
       btn.disabled = false;
-      if (res === 'shared') { buzz(14); return; }
-      if (res === 'cancelled') return;
-      toast(t('brief_share_no'), 'warn');
+    },
+  }) : null;
+
+  /* Kept for the platforms that do carry both at once — Android and desktop
+     put the brief and the pictures into the target app in a single step. */
+  const shareAllBtn = shareBtn ? el('button', {
+    class: 'btn btn-quiet btn-block btn-sm tiny',
+    html: icon('upload') + `<span>${esc(t('brief_share_all'))}</span>`,
+    onclick: async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      shareResult(await shareEverything(prompt, files));
+      btn.disabled = false;
     },
   }) : null;
 
@@ -143,7 +192,13 @@ export function openBrief({ kind, prompt, photos = [] }) {
       text: shareBtn ? t('brief_share_how') : t('brief_how') }),
 
     shareBtn,
-    shareBtn ? el('div', { style: { height: 'var(--s3)' } }) : null,
+    shareBtn ? el('ol', { class: 'micro muted', style: { margin: 'var(--s2) 0 var(--s3)', paddingInlineStart: '18px' } },
+      el('li', { text: t('brief_step1') }),
+      el('li', { text: t('brief_step2') }),
+      el('li', { text: t('brief_step3') }),
+    ) : null,
+    shareAllBtn,
+    shareAllBtn ? el('div', { style: { height: 'var(--s3)' } }) : null,
     copyBtn,
     el('div', { style: { marginTop: 'var(--s3)' } }, field),
 
