@@ -1,9 +1,22 @@
 /* ============================================================
    VESTRA · Service worker
-   App shell is cached for offline use. API calls are never cached.
+
+   The app shell is cached so it opens without a network. API calls are never
+   cached.
+
+   The app's own code is fetched network-first and only falls back to the cache
+   when there is no network. Cache-first is the usual advice and it was wrong
+   here: this app ships as plain files with unhashed names, so a cached
+   `makeup.js` is indistinguishable from the current one, and a fix pushed to
+   Pages stayed invisible on any device that had opened the app before. An app
+   under active development that shows you last week's build is worse than one
+   that takes an extra moment to start.
+
+   Assets that never change under the same name — fonts, icons — stay
+   cache-first, which is where the offline speed actually comes from.
    ============================================================ */
 
-const VERSION = 'vestra-v2';
+const VERSION = 'vestra-v3';
 const SHELL = [
   './',
   './index.html',
@@ -19,9 +32,12 @@ const SHELL = [
   './js/taxonomy.js',
   './js/ui.js',
   './js/ai.js',
+  './js/vision.js',
   './js/stylist.js',
   './js/makeup.js',
   './js/tryon.js',
+  './js/prompt.js',
+  './js/demo.js',
   './js/views/home.js',
   './js/views/wardrobe.js',
   './js/views/capture.js',
@@ -30,8 +46,13 @@ const SHELL = [
   './js/views/beauty.js',
   './js/views/profile.js',
   './js/views/lookcard.js',
+  './js/views/brief.js',
   './assets/icon.svg',
 ];
+
+/** Our own code — the files a deploy changes without changing their names. */
+const isAppCode = (url) => url.origin === location.origin
+  && /\.(?:js|css|html|webmanifest)$/.test(url.pathname);
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -73,18 +94,25 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Everything else: cache first, refresh in the background.
+  const keep = (res) => {
+    if (res.ok && (url.origin === location.origin || url.hostname.includes('fonts.'))) {
+      const copy = res.clone();
+      caches.open(VERSION).then(c => c.put(request, copy));
+    }
+    return res;
+  };
+
+  // Our own code: network first. The cache is the offline fallback, not the
+  // source of truth — otherwise a shipped fix never reaches a returning device.
+  if (isAppCode(url)) {
+    e.respondWith(fetch(request).then(keep).catch(() => caches.match(request)));
+    return;
+  }
+
+  // Everything else — fonts, icons, images: cache first, refresh behind it.
   e.respondWith(
     caches.match(request).then(hit => {
-      const net = fetch(request)
-        .then(res => {
-          if (res.ok && (url.origin === location.origin || url.hostname.includes('fonts.'))) {
-            const copy = res.clone();
-            caches.open(VERSION).then(c => c.put(request, copy));
-          }
-          return res;
-        })
-        .catch(() => hit);
+      const net = fetch(request).then(keep).catch(() => hit);
       return hit || net;
     }),
   );

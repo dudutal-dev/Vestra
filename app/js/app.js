@@ -166,7 +166,25 @@ const IS_LOCAL = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
 
 if ('serviceWorker' in navigator && location.protocol === 'https:' && !IS_LOCAL) {
   addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => { /* offline caching is optional */ });
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => reg.update().catch(() => {}))
+      .catch(() => { /* offline caching is optional */ });
+  });
+
+  // A new worker taking over means the modules already running on this page
+  // came from the previous build. Reload once, so the visit that fetched the
+  // update is also the visit that shows it.
+  //
+  // Only when a worker was already in charge: on a first-ever visit the
+  // controller arrives for the first time, and reloading there would be a
+  // pointless flash. The flag stops a worker that re-claims from looping the
+  // page forever.
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
   });
 } else if ('serviceWorker' in navigator && IS_LOCAL) {
   navigator.serviceWorker.getRegistrations()
