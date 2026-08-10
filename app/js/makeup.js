@@ -761,7 +761,7 @@ export function renderMakeup(canvas, photo, regions, steps, opts = {}) {
   const sampleSkin = makeSampler(photo);
   const box = faceBox(regions.face, w, h);
   const mask = buildFaceMask(regions.face, w, h, box);
-  const blurPx = Math.max(1, Math.round((regions.face?.rx || 0.25) * w * 0.035));
+  const blurPx = Math.max(1, Math.round((regions.face?.rx || 0.25) * w * 0.022));
 
   // One scratch layer, reused. Each region is painted, trimmed to the face and
   // composited on its own, so the adaptive blend decision stays per-side — the
@@ -836,7 +836,12 @@ export function renderMakeup(canvas, photo, regions, steps, opts = {}) {
       // through one blend mode would either tint nothing or smooth nothing.
       if (technique === 'base') {
         resetLayer();
-        if (paintSmoothing(lctx, photo, region, w, h, alpha * 1.9, blurPx)) flush('source-over');
+        // Foundation evens skin; it does not erase it. At 1.9 the softened copy
+        // of the face was composited hard enough to take freckles and pores
+        // with it, which is the same beautifying the render brief spends a
+        // paragraph forbidding. Enough to settle the tone, not enough to
+        // notice as a blur.
+        if (paintSmoothing(lctx, photo, region, w, h, alpha * 0.85, blurPx)) flush('source-over');
         resetLayer();
         paintWash(lctx, region, w, h, step.shade_hex, 0.55, alpha);
         flush(blend);
