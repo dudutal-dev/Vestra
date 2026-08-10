@@ -279,26 +279,38 @@ function paintShadow(ctx, region, w, h, hex, alpha, outward) {
 }
 
 /**
- * Mascara: short strokes lifting off the upper lash line.
+ * Mascara.
  *
- * Kept deliberately short and fine. Lashes are the one product where drawing
- * what you can see in a mirror — long, separated, dark — reads on a photo as a
- * comb sitting on the eye rather than as mascara.
+ * Drawn as a darkening of the lash line, not as lashes. Individual strokes
+ * were tried twice and land as a row of teeth — a comb sitting on the eye —
+ * at any length short enough to be plausible, because a phone photo does not
+ * have the resolution for a lash to be a line rather than a tick. What
+ * mascara does to a photograph is make the lash line denser and darker toward
+ * the outer corner, so that is what this draws: soft dabs, no edge anywhere.
  */
+const LASH_DABS = [
+  { u: -0.80, v: -0.16, r: 0.26, a: 0.40 },
+  { u: -0.44, v: -0.40, r: 0.30, a: 0.72 },
+  { u: -0.06, v: -0.52, r: 0.32, a: 0.94 },
+  { u: 0.32, v: -0.54, r: 0.34, a: 1.00 },
+  { u: 0.68, v: -0.44, r: 0.32, a: 1.00 },
+  { u: 0.96, v: -0.24, r: 0.26, a: 0.78 },
+];
+
 function paintLashes(ctx, region, w, h, hex, alpha, outward) {
-  return inRegion(ctx, region, w, h, (c, rx) => {
+  return inRegion(ctx, region, w, h, (c) => {
     const s = outward >= 0 ? 1 : -1;
-    c.strokeStyle = rgba(hex, alpha);
-    c.lineCap = 'round';
-    c.lineWidth = Math.max(0.05, 1.1 / rx);
-    for (let k = 0; k <= 9; k++) {
-      const u = -0.86 + (k / 9) * 1.72;                 // along the lid
-      const base = -Math.cos(u * 1.15) * 0.92;          // the lash line's curve
-      const lean = s * (0.04 + 0.16 * Math.max(0, u * s));   // outer lashes fan out
+    for (const dab of LASH_DABS) {
+      const x = s * dab.u, y = dab.v;
+      const peak = alpha * dab.a * 0.55;
+      const g = c.createRadialGradient(x, y, 0, x, y, dab.r);
+      g.addColorStop(0, rgba(hex, peak));
+      g.addColorStop(0.45, rgba(hex, peak * 0.6));
+      g.addColorStop(1, rgba(hex, 0));
+      c.fillStyle = g;
       c.beginPath();
-      c.moveTo(u, base + 0.06);
-      c.quadraticCurveTo(u + lean * 0.5, base - 0.14, u + lean, base - 0.30);
-      c.stroke();
+      c.arc(x, y, dab.r, 0, Math.PI * 2);
+      c.fill();
     }
   });
 }
@@ -403,6 +415,41 @@ const median = (arr) => {
   return s[s.length >> 1];
 };
 
+/**
+ * Separable box blur over a scalar field.
+ *
+ * Run before the mask is thresholded, not after. A lip in shadow and the
+ * specular highlight on a lower lip both fail a redness test on their own, so
+ * thresholding raw pixels leaves the lipstick full of holes and reads as
+ * something smudged rather than something applied. Softening the score first
+ * lets a pixel's neighbours vouch for it.
+ */
+function blurField(src, w, h, radius) {
+  if (radius < 1) return src;
+  const span = radius * 2 + 1;
+  const tmp = new Float32Array(src.length);
+  const out = new Float32Array(src.length);
+
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let sum = 0;
+    for (let x = -radius; x <= radius; x++) sum += src[row + clamp(x, 0, w - 1)];
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = sum / span;
+      sum += src[row + clamp(x + radius + 1, 0, w - 1)] - src[row + clamp(x - radius, 0, w - 1)];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let y = -radius; y <= radius; y++) sum += tmp[clamp(y, 0, h - 1) * w + x];
+    for (let y = 0; y < h; y++) {
+      out[y * w + x] = sum / span;
+      sum += tmp[clamp(y + radius + 1, 0, h - 1) * w + x] - tmp[clamp(y - radius, 0, h - 1) * w + x];
+    }
+  }
+  return out;
+}
+
 /* How each feature is told apart from the skin it sits in. `value` is the
    quantity that rises on the feature; the mask is what exceeds the ring. */
 const FEATURE = {
@@ -414,10 +461,14 @@ const FEATURE = {
     // Reaches past the ellipse, but not as far as the chin: the crease under a
     // lower lip is reddish too, and left unchecked the lipstick runs onto it.
     ring: [1.6, 3.0], edge: [1.18, 1.58],
-    // Cr - Cb: high on lips, low on skin, and unmoved by how bright the photo is.
-    value: (r, g, b) => (0.5 * r - 0.4187 * g - 0.0813 * b) - (-0.1687 * r - 0.3313 * g + 0.5 * b),
-    floor: 8,        // below this the mouth isn't distinguishable — give up
-    lo: 0.20, hi: 0.60,
+    // Redness as a share of total brightness, so a lip in shadow and a lip
+    // catching the light score the same. A plain Cr-Cb difference does not:
+    // it collapses in the shadow at the mouth corners and on the wet
+    // highlight of a lower lip, and the lipstick comes out in patches.
+    value: (r, g, b) => (255 * (r - (g + b) / 2)) / (r + g + b + 1),
+    floor: 5,        // below this the mouth isn't distinguishable — give up
+    blur: 0.055,
+    lo: 0.12, hi: 0.52,
   },
   brow: {
     // Tighter: an eye socket is dark too, and a brow mask that reaches down
@@ -426,6 +477,7 @@ const FEATURE = {
     ring: [1.25, 2.5], edge: [0.98, 1.32],
     value: (r, g, b) => -luminance(r, g, b),   // brows are the dark thing here
     floor: 12,
+    blur: 0.03,
     lo: 0.22, hi: 0.68,
   },
 };
@@ -458,21 +510,26 @@ function featureMask(photo, region, w, h, kind) {
   const cs = Math.cos(-rot), sn = Math.sin(-rot);
 
   const N = box.w * box.h;
-  const val = new Float32Array(N);
+  const raw = new Float32Array(N);
   const rad = new Float32Array(N);
-  const ring = [];
 
   for (let y = 0, i = 0; y < box.h; y++) {
     for (let x = 0; x < box.w; x++, i++) {
       const dx = x - ecx, dy = y - ecy;
       const u = (dx * cs - dy * sn) / rx, v = (dx * sn + dy * cs) / ry;
-      const r2 = u * u + v * v;
-      rad[i] = r2;
+      rad[i] = u * u + v * v;
       const o = i * 4;
-      val[i] = spec.value(d[o], d[o + 1], d[o + 2]);
-      // The ring is skin: outside the feature, close enough to share its light.
-      if (r2 > spec.ring[0] && r2 < spec.ring[1]) ring.push(val[i]);
+      raw[i] = spec.value(d[o], d[o + 1], d[o + 2]);
     }
+  }
+
+  const val = blurField(raw, box.w, box.h,
+    Math.round((spec.blur || 0) * Math.min(box.w, box.h)));
+
+  // The ring is skin: outside the feature, close enough to share its light.
+  const ring = [];
+  for (let i = 0; i < N; i++) {
+    if (rad[i] > spec.ring[0] && rad[i] < spec.ring[1]) ring.push(val[i]);
   }
   if (ring.length < 24) return null;
 

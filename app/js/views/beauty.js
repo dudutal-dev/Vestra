@@ -281,11 +281,21 @@ function simulationBlock(look, ctx) {
   const intensityRange = el('input', {
     class: 'slider', type: 'range', min: '0', max: '150', value: '100',
     'aria-label': t('sim_intensity'),
-    oninput: (e) => { intensity = +e.target.value / 100; draw(); },
+    oninput: (e) => { intensity = +e.target.value / 100; scheduleDraw(); },
   });
 
   let intensityForBrief = () => intensity;
   let photoEl = null;
+
+  // A drag fires `input` far faster than a full repaint of the face, and every
+  // event but the last one is already stale by the time it is drawn. One
+  // render per frame, on the newest value.
+  let queued = 0;
+  function scheduleDraw() {
+    if (queued) return;
+    queued = requestAnimationFrame(() => { queued = 0; draw(); });
+  }
+
   async function draw() {
     try {
       photoEl ||= await loadImage(rec.photo);
