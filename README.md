@@ -74,16 +74,12 @@ It holds the same seven gates, and reads your profile the same way. Your **cover
 ### 📸 Batch cataloging
 Select ten garment photos at once and they catalog in sequence with a progress readout — the fastest way to get a wardrobe in.
 
-### 🎬 A photograph, not a drawing
-The simulations on the look card and in the beauty view are drawn on canvas — instant, free, and offline, but a drawing. **Render brief** is the way past that ceiling: it writes the instruction an image model needs and gathers the photos it refers to.
+### 🎬 A brief for a full render
+The simulations on the look card and in the beauty view are drawn on canvas — instant, free, and offline, but a drawing. When you want a photograph, **Render brief** writes the instruction an image model needs and hands you the photos it refers to.
 
 The brief names each product by where it sits rather than what it is called, carries every shade as a hex, and lets the face analysis shape it — hooded lids get the shadow placed above the crease, a warm undertone is told not to correct itself away. For an outfit it lists colour, fabric, cut and placement per piece, and attaches your actual garment photographs, because a model that can see the garment reproduces it while one reading a description invents something similar. Its longest paragraph is the one about what must *not* change: same face, same pose, same lighting, same background, skin texture intact, nothing smoothed or slimmed.
 
-Where that brief goes depends on one thing: whether you have given the app an image-model key.
-
-**With a fal.ai key** (Profile → fal.ai key), the brief and its photos go straight from your browser to `fal.run` and the picture comes back into the sheet — Gemini 3 Pro Image, the tier chosen because every render here is an edit of a photograph of a real person and identity survival is the whole job. Reference photos travel as `data:` URIs rather than uploaded files, so your face never lands in a public bucket to be fetched back out. The key lives in localStorage on your device and goes nowhere but fal, exactly like the Anthropic key. Renders are billed to your own account, and the sheet says so before you press anything.
-
-**Without a key**, nothing changes: copy the brief, save the photos, and run it wherever you already have an image model — a Claude conversation with an image connector, for instance. Nothing leaves your device until you attach it yourself.
+Copy it, attach the photos, and run it wherever you already have an image model — a Claude conversation with an image connector, for instance. VESTRA is a static site with no server, so it writes the brief rather than running the render; nothing leaves your device until you attach it yourself.
 
 ### 🧪 A sample wardrobe to try it against
 **Profile → Load sample wardrobe** drops in a 25-piece capsule spanning formality 2 to 6, so the Studio can close a look and the health report has something to count before you have photographed anything of your own. The garments are drawn by the app rather than shipped as files — laid flat on a plain ground, which is the same shot the guide asks you for and the same one the try-on's cutout expects. One tap removes them again, and nothing you added yourself is touched.
@@ -96,7 +92,7 @@ Where that brief goes depends on one thing: whether you have given the app an im
 
 - Photos, wardrobe and looks live in **IndexedDB on your device**
 - Your profile and API key live in **localStorage on your device**
-- Your API keys go **directly to `api.anthropic.com` and `fal.run`** and nowhere else
+- Your API key goes **directly to `api.anthropic.com`** and nowhere else
 - Your **face and body photos never leave the device** except at the moment you press *Analyze*, and are excluded from backups unless you explicitly opt in
 - Export your whole closet to JSON at any time; erase everything with one button
 
@@ -136,12 +132,6 @@ Get one at [console.anthropic.com](https://console.anthropic.com/settings/keys),
 Model options: `claude-opus-5` (most capable, the default), `claude-sonnet-5` (fast and economical), `claude-haiku-4-5` (fastest).
 
 > **Cost note:** photos are compressed to 1280px / JPEG q0.85 before upload, which cuts image tokens by roughly 70% with no measurable loss in recognition quality.
-
-### Add a fal.ai key, for photographic renders
-
-Optional, and independent of the Anthropic one. Get it at [fal.ai/dashboard/keys](https://fal.ai/dashboard/keys), then in the app: **Profile → fal.ai key**. A *Render a photo* button appears in the render brief; without the key that sheet keeps its existing copy-and-attach behaviour.
-
-The browser calls `queue.fal.run` directly. If your page is served from a host that fal does not allow cross-origin, the request is refused by the browser rather than by fal — the sheet reports that case separately from a bad key or an empty balance, so you can tell them apart.
 
 ---
 
@@ -183,7 +173,6 @@ vestra/
 │       ├── i18n.js               # Hebrew/English dictionary
 │       ├── taxonomy.js           # categories, occasions, formality, palettes
 │       ├── ai.js                 # Claude client + prompts + image compression
-│       ├── render.js             # fal.ai image-model client — the owner's key, no server
 │       ├── vision.js             # on-device face & body analysis — no key needed
 │       ├── stylist.js            # offline rules engine
 │       ├── makeup.js             # canvas makeup renderer (adaptive blend modes)
