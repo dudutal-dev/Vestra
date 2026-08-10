@@ -74,12 +74,37 @@ async function asFile(dataUrl, filename) {
  * same tap. The owner picks the app, the pictures arrive, and the brief is
  * already waiting to be pasted.
  *
- * Two details make it work rather than nearly work. The files are built before
- * the tap, because iOS treats the user gesture as spent once an await has
- * resolved and refuses the share. And the clipboard write is started but not
+ * Three details make it work rather than nearly work. The files are built
+ * before the tap, because iOS treats the user gesture as spent once an await
+ * has resolved and refuses the share. The clipboard write is started but not
  * awaited, for the same reason — it lands during the gesture while `share` is
- * still the thing being called from it.
+ * still the thing being called from it. And it is started *first*: `share`
+ * spends the gesture the instant it is called, so a clipboard write placed
+ * after it is refused every time. Reversing those two lines looks harmless,
+ * costs nothing on desktop, and silently ships an iPhone the photographs with
+ * no brief to paste beside them.
  */
+
+/**
+ * Put the brief on the clipboard from inside a user gesture.
+ *
+ * Safari added the promise form of `ClipboardItem` for exactly this: the write
+ * is authorised at the moment of the tap and the content is allowed to arrive
+ * later. `writeText` has to have its string ready synchronously, and is the
+ * fallback everywhere else.
+ */
+function copyForShare(text) {
+  const clip = navigator.clipboard;
+  if (!clip) return Promise.reject(new Error('no clipboard'));
+  try {
+    if (typeof ClipboardItem === 'function' && clip.write) {
+      const blob = new Blob([text], { type: 'text/plain' });
+      return clip.write([new ClipboardItem({ 'text/plain': Promise.resolve(blob) })]);
+    }
+  } catch { /* fall through to writeText */ }
+  return clip.writeText(text);
+}
+
 /**
  * Call `navigator.share` without letting it take the app down with it.
  *
@@ -107,47 +132,47 @@ function shareOnce(payload) {
     () => done('shared'),
     (e) => done(e?.name === 'AbortError' ? 'cancelled' : 'unsupported'));
 
-  // The watchdog frees the button; it does not cancel the share. It releases
-  // `sharing` as well, because a share that has not answered in six seconds is
-  // one WebKit has lost track of, and refusing every later attempt on its
-  // behalf helps nobody.
+  /* The watchdog frees the button; it does not cancel the share. Two and a half
+     seconds, not six: while the system sheet is up the page is covered anyway,
+     so the only thing a long wait buys is a dead button once the sheet closes —
+     which is the freeze itself, seen from the owner's side. It releases
+     `sharing` too, because a share that has not answered by now is one WebKit
+     has lost track of, and refusing every later attempt on its behalf helps
+     nobody. */
   const watchdog = new Promise(resolve => setTimeout(() => {
     if (settled) return;
     sharing = false;
     resolve('pending');
-  }, 6000));
+  }, 2500));
 
   return Promise.race([call, watchdog]);
 }
 
 async function sharePhotosAndCopy(text, files) {
-  if (!navigator.share || !files?.length) return 'unsupported';
+  if (!navigator.share || !files?.length) return { share: 'unsupported', copied: false };
   const payload = { files };
-  if (navigator.canShare && !navigator.canShare(payload)) return 'unsupported';
+  if (navigator.canShare && !navigator.canShare(payload)) return { share: 'unsupported', copied: false };
 
-  /* `share` goes first. Both calls want the user gesture, and the clipboard is
-     the one that can be dropped without breaking anything — the brief is still
-     in the textarea to copy by hand. Losing the share loses the handover. */
-  const res = shareOnce(payload);
-
+  // Clipboard first, share second, neither awaited before the other is called.
+  // See the note above — the order is the whole trick.
   let copied = true;
   try {
-    navigator.clipboard?.writeText(text).catch(() => { copied = false; });
+    copyForShare(text).catch(() => { copied = false; });
   } catch {
     copied = false;
   }
 
-  const out = await res;
-  if (out !== 'shared') return out;
-  return copied ? 'shared' : 'shared-no-copy';
+  const share = await shareOnce(payload);
+  return { share, copied };
 }
 
 /** Text and files in one share — right where the platform allows it. */
 async function shareEverything(text, files) {
   if (!navigator.share || !files?.length) return 'unsupported';
   const payload = { text, files };
-  if (navigator.canShare && !navigator.canShare(payload)) return 'unsupported';
-  return shareOnce(payload);
+  if (navigator.canShare && !navigator.canShare(payload)) return { share: 'unsupported', copied: true };
+  // The text travels inside the share here, so there is nothing to copy.
+  return { share: await shareOnce(payload), copied: true };
 }
 
 /**
@@ -191,16 +216,22 @@ export function openBrief({ kind, prompt, photos = [] }) {
       .catch(() => { files = null; });
   }
 
-  const shareResult = (res) => {
-    if (res === 'shared') { buzz(14); toast(t('brief_share_done')); return; }
-    if (res === 'shared-no-copy') { buzz(14); toast(t('brief_share_nocopy'), 'warn'); return; }
-    if (res === 'cancelled' || res === 'busy') return;
-    // The system sheet never answered. Saying nothing would be wrong — the
-    // button just came back to life and the owner needs to know it is tappable
-    // again — but so would calling it a failure, because the share may well
-    // have gone through.
-    if (res === 'pending') { toast(t('brief_share_slow'), 'warn'); return; }
-    toast(t('brief_share_no'), 'warn');
+  /* Whatever the share does, the owner is told what happened to the copy.
+     That is the half of the handover this screen can actually be sure about,
+     and the half that decides whether there is anything to paste — a silent
+     tap that moved six photographs and no brief is exactly the failure this
+     split was built to avoid. */
+  const shareResult = ({ share, copied }) => {
+    if (share === 'busy') return;
+    if (share === 'shared' || share === 'pending') {
+      buzz(14);
+      toast(copied ? t('brief_share_done') : t('brief_share_nocopy'), copied ? '' : 'warn');
+      return;
+    }
+    // Backed out of the system sheet. Nothing was sent — but the brief is on
+    // the clipboard either way, and that is worth a line.
+    if (share === 'cancelled') { if (copied) toast(t('brief_copied')); return; }
+    toast(copied ? t('brief_share_no_copied') : t('brief_share_no'), 'warn');
   };
 
   const shareBtn = photos.length && navigator.share ? el('button', {
