@@ -284,6 +284,19 @@ export function renderCapture(root, ctx) {
     } catch (e) {
       toast(errText(e), 'bad');
       if (e instanceof AIError && e.code === 'no_key') ctx.go('profile');
+
+      // A face the detector could not read is not a dead end: the photo is
+      // fine, only the three anchors are missing, and those can be placed by
+      // hand in a few seconds. Keep the photo and go and ask for them.
+      else if (mode === 'face' && state.shot?.dataUrl) {
+        await Media.put({
+          slot: 'face', createdAt: Date.now(), photo: state.shot.dataUrl,
+          w: state.shot.w, h: state.shot.h, face: null, regions: null, engine: 'manual',
+        });
+        await refreshMedia();
+        state.shot = null;
+        ctx.go('anchors');
+      }
     } finally {
       clearInterval(tick);
       zone.classList.remove('scanning');

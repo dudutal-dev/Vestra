@@ -14,6 +14,7 @@ import { renderStudio } from './views/studio.js';
 import { renderCloset } from './views/closet.js';
 import { renderBeauty } from './views/beauty.js';
 import { renderProfile } from './views/profile.js';
+import { renderAnchors } from './views/anchors.js';
 import { renderLookCard } from './views/lookcard.js';
 
 const VIEWS = {
@@ -23,6 +24,7 @@ const VIEWS = {
   studio:   renderStudio,
   closet:   renderCloset,
   beauty:   renderBeauty,
+  anchors:  renderAnchors,
   profile:  renderProfile,
 };
 

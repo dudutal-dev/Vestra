@@ -330,6 +330,14 @@ function simulationBlock(look, ctx) {
       html: icon('sparkles') + `<span>${esc(t('brief_open'))}</span>`,
       onclick: () => openMakeupBrief(look, { intensity: intensityForBrief() }),
     }),
+    // The detector places the anchors well or says it cannot. It has no way to
+    // place them *badly and know it*, so the judgement of whether the makeup
+    // landed belongs to whoever is looking at their own face.
+    el('button', {
+      class: 'btn btn-quiet btn-block btn-sm tiny',
+      html: icon('user') + `<span>${esc(t('anchor_fix'))}</span>`,
+      onclick: () => ctx.go('anchors'),
+    }),
   );
 }
 
