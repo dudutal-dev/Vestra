@@ -104,16 +104,22 @@ export function techniqueFor(step) {
 }
 
 /* How strongly each product sits on skin, and how far its edge feathers. */
+/* How strongly each product sits on skin, and how far its edge feathers.
+
+   These are much lower than a first guess suggests. Makeup on a photograph is
+   a modulation of pixels that are already there, not a colour laid on top: at
+   0.4 a blush is a pink disc with a visible edge, and at 0.17 it is a flush.
+   The rule throughout is that the photograph's own luminance has to survive. */
 const STRENGTH = {
-  base:      { alpha: 0.26, blend: 'soft-light', adaptive: true },
-  lipstick:  { alpha: 0.78, blend: 'source-over' },
-  liner:     { alpha: 0.82, blend: 'multiply' },
-  lashes:    { alpha: 0.80, blend: 'multiply' },
-  brow:      { alpha: 0.52, blend: 'multiply' },
-  shadow:    { alpha: 0.46, blend: 'multiply' },
-  blush:     { alpha: 0.40, blend: 'multiply', adaptive: true },
-  contour:   { alpha: 0.26, blend: 'multiply' },
-  highlight: { alpha: 0.34, blend: 'screen', dimOnDark: true },
+  base:      { alpha: 0.24, blend: 'soft-light', adaptive: true },
+  lipstick:  { alpha: 0.70, blend: 'multiply' },
+  liner:     { alpha: 0.78, blend: 'multiply' },
+  lashes:    { alpha: 0.72, blend: 'multiply' },
+  brow:      { alpha: 0.50, blend: 'multiply' },
+  shadow:    { alpha: 0.28, blend: 'multiply' },
+  blush:     { alpha: 0.17, blend: 'multiply', adaptive: true },
+  contour:   { alpha: 0.14, blend: 'multiply' },
+  highlight: { alpha: 0.20, blend: 'screen', dimOnDark: true },
 };
 
 /* A shimmer finish gets a second, softer pass in screen mode so it catches light. */
@@ -204,25 +210,71 @@ function paintLips(ctx, region, w, h, hex, alpha) {
 
 /**
  * Eyeliner along the upper lash line.
+ *
+ * The stroke hugs the lash line and stays thin. A wide soft band over an eye
+ * that already has dark lashes reads as a smudge and disappears; a narrow
+ * defined edge is what the eye is actually looking for.
+ *
  * `outward` is +1 when the eye's outer corner points right in the image.
  * `wing` is 0 for a tightline and 1 for a full cat-eye.
  */
 function paintLiner(ctx, region, w, h, hex, alpha, outward, wing) {
   return inRegion(ctx, region, w, h, (c) => {
     const s = outward >= 0 ? 1 : -1;
-    const t = 0.30;                       // how thick the stroke gets at its middle
-    const wx = s * (1.05 + 0.62 * wing);
-    const wy = -1.05 - 0.55 * wing;
+    const t = 0.22;                       // thickness at the middle of the stroke
+    const wx = s * (1.16 + 0.55 * wing);
+    const wy = -0.86 - 0.52 * wing;
 
     c.beginPath();
-    c.moveTo(-s * 1.04, 0.02);                                   // inner corner
-    c.quadraticCurveTo(0, -1.30, s * 0.94, -0.52);               // over the lash line
+    c.moveTo(-s * 1.02, -0.06);                                  // inner corner
+    c.quadraticCurveTo(0, -1.02, s * 0.98, -0.44);               // along the lash line
     if (wing > 0.02) c.lineTo(wx, wy);                           // the flick
-    c.quadraticCurveTo(s * 0.86, -0.44 + t, s * 0.72, -0.34 + t);
-    c.quadraticCurveTo(0, -1.22 + t * 1.6, -s * 1.04, 0.02 + t * 0.35);
+    c.quadraticCurveTo(s * 0.88, -0.40 + t * 0.7, s * 0.74, -0.30 + t);
+    c.quadraticCurveTo(0, -0.94 + t * 1.5, -s * 1.02, -0.06 + t * 0.3);
     c.closePath();
     c.fillStyle = rgba(hex, alpha);
     c.fill();
+  });
+}
+
+/**
+ * Eyeshadow on the mobile lid.
+ *
+ * A radial disc over an eye is the shape nobody's eyeshadow has: it lands on
+ * the eyeball as much as on the lid, and its roundness is what makes the
+ * result read as a smudge. This is a crescent — following the curve of the
+ * lid, deepest at the outer corner where shadow is actually built up, fading
+ * upward into the socket and to nothing at the inner corner.
+ */
+function paintShadow(ctx, region, w, h, hex, alpha, outward) {
+  // Dabs along the lash line rather than one filled shape. A path has an edge,
+  // and an edge on eyeshadow is the tell: it reads as a sticker or a bruise.
+  // Each dab fades to nothing on its own, so the union has no boundary
+  // anywhere — which is what a blended shadow is.
+  const DABS = [
+    { u: -0.70, v: -0.26, r: 0.52, a: 0.35 },   // inner corner, barely there
+    { u: -0.26, v: -0.40, r: 0.62, a: 0.62 },
+    { u: 0.18, v: -0.48, r: 0.70, a: 0.90 },
+    { u: 0.62, v: -0.48, r: 0.74, a: 1.00 },    // the outer third carries it
+    { u: 0.94, v: -0.34, r: 0.62, a: 0.85 },
+    { u: 0.40, v: -0.80, r: 0.60, a: 0.45 },    // a lift into the crease
+  ];
+  return inRegion(ctx, region, w, h, (c) => {
+    const s = outward >= 0 ? 1 : -1;
+    for (const d of DABS) {
+      const x = s * d.u, y = d.v;
+      // Each dab is weak; the overlap between them builds the depth, the same
+      // way the third pass of a brush does.
+      const peak = alpha * d.a * 0.46;
+      const g = c.createRadialGradient(x, y, 0, x, y, d.r);
+      g.addColorStop(0, rgba(hex, peak));
+      g.addColorStop(0.42, rgba(hex, peak * 0.62));
+      g.addColorStop(1, rgba(hex, 0));
+      c.fillStyle = g;
+      c.beginPath();
+      c.arc(x, y, d.r, 0, Math.PI * 2);
+      c.fill();
+    }
   });
 }
 
@@ -304,6 +356,190 @@ function eraseWash(ctx, region, w, h, shrink = 1) {
 }
 
 /* ============================================================
+   Masks cut from the photograph
+
+   A drawn shape is the single biggest reason a simulation reads as a sticker.
+   A mouth glyph is never quite *this* mouth, and a brow drawn as an arc floats
+   above the brow that is already there — both land as clip-art on a face.
+
+   But neither feature has to be invented, because both are visible in the
+   photograph: lips are redder than the skin around them, brows are darker.
+   Finding those pixels and tinting only them is what makes lipstick follow her
+   own lip line, keep the mouth line readable, and leave the highlight where
+   the light actually fell.
+
+   The reference for "redder" and "darker" is the ring of skin just outside the
+   region rather than a fixed threshold, so the same code works on a face lit
+   from one side, on any skin depth, and in any white balance.
+
+   If the feature can't be told apart from its surroundings the mask comes back
+   null and the drawn shape takes over — a rough shape beats no product at all.
+   ============================================================ */
+
+const smoothstep = (a, b, x) => {
+  if (b <= a) return x >= b ? 1 : 0;
+  const t = clamp((x - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+
+/** The axis-aligned pixel box that contains a rotated region, with room around it. */
+function regionBox(region, w, h, pad) {
+  const rx = Math.abs(region.rx || 0) * w;
+  const ry = Math.abs(region.ry || 0) * h;
+  const rot = ((region.rot || 0) * Math.PI) / 180;
+  const ex = Math.hypot(rx * Math.cos(rot), ry * Math.sin(rot)) * pad;
+  const ey = Math.hypot(rx * Math.sin(rot), ry * Math.cos(rot)) * pad;
+  const cx = region.cx * w, cy = region.cy * h;
+  const x = clamp(Math.floor(cx - ex), 0, w - 2);
+  const y = clamp(Math.floor(cy - ey), 0, h - 2);
+  const x2 = clamp(Math.ceil(cx + ex), x + 2, w);
+  const y2 = clamp(Math.ceil(cy + ey), y + 2, h);
+  return { x, y, w: x2 - x, h: y2 - y };
+}
+
+const median = (arr) => {
+  if (!arr.length) return 0;
+  const s = Float64Array.from(arr).sort();
+  return s[s.length >> 1];
+};
+
+/* How each feature is told apart from the skin it sits in. `value` is the
+   quantity that rises on the feature; the mask is what exceeds the ring. */
+const FEATURE = {
+  lips: {
+    // Reaches well past the estimated ellipse. The ellipse is a guess at where
+    // the mouth is; the redness test is what actually finds it, and an upper
+    // lip left bare because the guess sat low is worse than a wide search.
+    pad: 1.8,
+    // Reaches past the ellipse, but not as far as the chin: the crease under a
+    // lower lip is reddish too, and left unchecked the lipstick runs onto it.
+    ring: [1.6, 3.0], edge: [1.18, 1.58],
+    // Cr - Cb: high on lips, low on skin, and unmoved by how bright the photo is.
+    value: (r, g, b) => (0.5 * r - 0.4187 * g - 0.0813 * b) - (-0.1687 * r - 0.3313 * g + 0.5 * b),
+    floor: 8,        // below this the mouth isn't distinguishable — give up
+    lo: 0.20, hi: 0.60,
+  },
+  brow: {
+    // Tighter: an eye socket is dark too, and a brow mask that reaches down
+    // into it paints a shadow where a pencil would never go.
+    pad: 1.4,
+    ring: [1.25, 2.5], edge: [0.98, 1.32],
+    value: (r, g, b) => -luminance(r, g, b),   // brows are the dark thing here
+    floor: 12,
+    lo: 0.22, hi: 0.68,
+  },
+};
+
+/**
+ * Build a soft alpha mask of one feature, in the photo's own pixels.
+ * @returns {{canvas: HTMLCanvasElement, box: object}|null}
+ */
+function featureMask(photo, region, w, h, kind) {
+  const spec = FEATURE[kind];
+  if (!spec || !region || typeof region.cx !== 'number') return null;
+
+  const box = regionBox(region, w, h, spec.pad);
+  if (box.w < 8 || box.h < 8) return null;
+
+  const c = document.createElement('canvas');
+  c.width = box.w; c.height = box.h;
+  const cx = c.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(photo, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+
+  let img;
+  try { img = cx.getImageData(0, 0, box.w, box.h); } catch { return null; }
+  const d = img.data;
+
+  // Where each pixel sits relative to the region ellipse, as r².
+  const ecx = region.cx * w - box.x, ecy = region.cy * h - box.y;
+  const rx = Math.max(2, Math.abs(region.rx || 0) * w);
+  const ry = Math.max(2, Math.abs(region.ry || 0) * h);
+  const rot = ((region.rot || 0) * Math.PI) / 180;
+  const cs = Math.cos(-rot), sn = Math.sin(-rot);
+
+  const N = box.w * box.h;
+  const val = new Float32Array(N);
+  const rad = new Float32Array(N);
+  const ring = [];
+
+  for (let y = 0, i = 0; y < box.h; y++) {
+    for (let x = 0; x < box.w; x++, i++) {
+      const dx = x - ecx, dy = y - ecy;
+      const u = (dx * cs - dy * sn) / rx, v = (dx * sn + dy * cs) / ry;
+      const r2 = u * u + v * v;
+      rad[i] = r2;
+      const o = i * 4;
+      val[i] = spec.value(d[o], d[o + 1], d[o + 2]);
+      // The ring is skin: outside the feature, close enough to share its light.
+      if (r2 > spec.ring[0] && r2 < spec.ring[1]) ring.push(val[i]);
+    }
+  }
+  if (ring.length < 24) return null;
+
+  const ref = median(ring);
+  let peak = 0;
+  for (let i = 0; i < N; i++) {
+    if (rad[i] <= 1.05) peak = Math.max(peak, val[i] - ref);
+  }
+  if (peak < spec.floor) return null;   // nothing here stands out — fall back
+
+  const lo = peak * spec.lo, hi = peak * spec.hi;
+  for (let i = 0; i < N; i++) {
+    // Fade out past the search radius so the ring itself cannot be painted.
+    const edge = 1 - smoothstep(spec.edge[0], spec.edge[1], Math.sqrt(rad[i]));
+    const a = smoothstep(lo, hi, val[i] - ref) * edge;
+    const o = i * 4;
+    d[o] = 255; d[o + 1] = 255; d[o + 2] = 255;
+    d[o + 3] = Math.round(clamp(a, 0, 1) * 255);
+  }
+  cx.putImageData(img, 0, 0);
+
+  // One soft pass so the rim is a gradient rather than a staircase of pixels.
+  if (typeof cx.filter === 'string') {
+    const soft = document.createElement('canvas');
+    soft.width = box.w; soft.height = box.h;
+    const sctx = soft.getContext('2d');
+    sctx.filter = `blur(${Math.max(1, Math.round(Math.min(box.w, box.h) * 0.035))}px)`;
+    sctx.drawImage(c, 0, 0);
+    return { canvas: soft, box };
+  }
+  return { canvas: c, box };
+}
+
+/* Masks are per-photo and per-region, and the intensity slider re-renders on
+   every input event — so they are computed once and kept. */
+const MASK_CACHE = new WeakMap();
+
+function maskFor(photo, region, w, h, kind) {
+  let byKey = MASK_CACHE.get(photo);
+  if (!byKey) { byKey = new Map(); MASK_CACHE.set(photo, byKey); }
+  const key = `${kind}:${region?.cx},${region?.cy},${region?.rx},${region?.ry},${region?.rot}`;
+  if (byKey.has(key)) return byKey.get(key);
+  let out = null;
+  try { out = featureMask(photo, region, w, h, kind); } catch { out = null; }
+  byKey.set(key, out);
+  return out;
+}
+
+/** Lay a shade through a mask: the colour goes only where the feature is. */
+function paintThroughMask(ctx, mask, hex, alpha) {
+  if (!mask) return false;
+  const tint = document.createElement('canvas');
+  tint.width = mask.box.w; tint.height = mask.box.h;
+  const t = tint.getContext('2d');
+  t.fillStyle = rgba(hex, 1);
+  t.fillRect(0, 0, tint.width, tint.height);
+  t.globalCompositeOperation = 'destination-in';
+  t.drawImage(mask.canvas, 0, 0);
+
+  ctx.save();
+  ctx.globalAlpha = clamp(alpha, 0, 1);
+  ctx.drawImage(tint, mask.box.x, mask.box.y);
+  ctx.restore();
+  return true;
+}
+
+/* ============================================================
    Sampling and masking
    ============================================================ */
 
@@ -370,6 +606,13 @@ const liftToLid = (r) => ({
   ry: (r.ry ?? 0) * 0.9,
 });
 
+/** The inverse — a lid ellipse dropped back down onto the eye it sits over. */
+const dropToEye = (r) => ({
+  ...r,
+  cy: (r.cy ?? 0) + (r.ry ?? 0) * 0.55,
+  ry: (r.ry ?? 0) / 0.9,
+});
+
 /**
  * The regions a step paints, tagged with which side of the face they are on so
  * a wing or a brow tail knows which way is outward.
@@ -382,9 +625,11 @@ function targetsFor(step, technique, regions) {
     const l = regions.eye_left, r = regions.eye_right;
     if (l || r) return [l && side(l, -1), r && side(r, 1)].filter(Boolean);
   }
+  // Shadow is drawn as a crescent rising off the lash line, so it wants the eye
+  // opening — the measured thing — rather than the lid derived from it.
   if (technique === 'shadow') {
-    const l = regions.lid_left || (regions.eye_left && liftToLid(regions.eye_left));
-    const r = regions.lid_right || (regions.eye_right && liftToLid(regions.eye_right));
+    const l = regions.eye_left || (regions.lid_left && dropToEye(regions.lid_left));
+    const r = regions.eye_right || (regions.lid_right && dropToEye(regions.lid_right));
     return [l && side(l, -1), r && side(r, 1)].filter(Boolean);
   }
   if (technique === 'lipstick') {
@@ -521,16 +766,25 @@ export function renderMakeup(canvas, photo, regions, steps, opts = {}) {
         continue;
       }
 
+      // Lips and brows are found in the photograph rather than drawn over it.
+      // The drawn shape stays as the fallback for a photo where the feature
+      // can't be told apart from the skin around it.
+      const cut = technique === 'lipstick' ? maskFor(photo, region, w, h, 'lips')
+        : technique === 'brow' ? maskFor(photo, region, w, h, 'brow')
+          : null;
+
       const draw = (a) => {
         switch (technique) {
-          case 'lipstick':  return paintLips(lctx, region, w, h, step.shade_hex, a);
+          case 'lipstick':  return cut ? paintThroughMask(lctx, cut, step.shade_hex, a)
+            : paintLips(lctx, region, w, h, step.shade_hex, a);
           case 'liner':     return paintLiner(lctx, region, w, h, step.shade_hex, a, outward, wing);
           case 'lashes':    return paintLashes(lctx, region, w, h, step.shade_hex, a, outward);
-          case 'brow':      return paintBrow(lctx, region, w, h, step.shade_hex, a, outward);
-          case 'shadow':    return paintWash(lctx, region, w, h, step.shade_hex, 0.34, a);
-          case 'blush':     return paintWash(lctx, region, w, h, step.shade_hex, 0.18, a);
-          case 'contour':   return paintWash(lctx, region, w, h, step.shade_hex, 0.16, a);
-          case 'highlight': return paintWash(lctx, region, w, h, step.shade_hex, 0.22, a);
+          case 'brow':      return cut ? paintThroughMask(lctx, cut, step.shade_hex, a)
+            : paintBrow(lctx, region, w, h, step.shade_hex, a, outward);
+          case 'shadow':    return paintShadow(lctx, region, w, h, step.shade_hex, a, outward);
+          case 'blush':     return paintWash(lctx, region, w, h, step.shade_hex, 0, a);
+          case 'contour':   return paintWash(lctx, region, w, h, step.shade_hex, 0, a);
+          case 'highlight': return paintWash(lctx, region, w, h, step.shade_hex, 0.06, a);
           default:          return false;
         }
       };
@@ -543,12 +797,14 @@ export function renderMakeup(canvas, photo, regions, steps, opts = {}) {
       }
       flush(blend);
 
-      // Opaque products get a second, gentler pass so they read as coverage
-      // rather than a tint — a lipstick that only multiplies looks like a stain.
+      // Lipstick is the one product that genuinely changes the hue of what is
+      // under it rather than only deepening it, so it gets a second pass laid
+      // on rather than multiplied. Kept light: the multiply below it is what
+      // carries the depth, and this only moves the colour.
       if (technique === 'lipstick') {
         resetLayer();
-        draw(alpha * 0.55);
-        flush('multiply');
+        draw(alpha * (cut ? 0.34 : 0.5));
+        flush('source-over');
       }
 
       if (hasSheen(step)) {
