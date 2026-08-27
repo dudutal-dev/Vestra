@@ -64,13 +64,17 @@ function inlinePart(dataUrl) {
  *                the numbering is load-bearing, so the order must survive here
  * @returns {{ dataUrl: string }}
  */
+/* When the account can't see the default model yet, the render should not
+   die on a name — the previous generation still exists and still works. */
+const FALLBACK_MODEL = 'gemini-2.5-flash-image';
+
 export async function renderImage({ prompt, photos = [] }) {
   if (!hasGoogleKey()) throw new AIError('no_gkey');
   const ratio = await subjectRatio(photos);
-  return attemptRender({ prompt, photos, ratio }, 0);
+  return attemptRender({ prompt, photos, ratio, model: Settings.imageModel }, 0);
 }
 
-async function attemptRender({ prompt, photos, ratio }, attempt) {
+async function attemptRender({ prompt, photos, ratio, model }, attempt) {
   if (!navigator.onLine) throw new AIError('offline');
 
   /* Order decides whether this is an edit or an invention. With the whole
@@ -94,7 +98,7 @@ async function attemptRender({ prompt, photos, ratio }, attempt) {
 
   let res;
   try {
-    res = await fetch(`${ENDPOINT}/${Settings.imageModel}:generateContent`, {
+    res = await fetch(`${ENDPOINT}/${model}:generateContent`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -108,10 +112,15 @@ async function attemptRender({ prompt, photos, ratio }, attempt) {
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
+    // The account doesn't see this model (yet) — fall back a generation.
+    if ((res.status === 404 || (res.status === 400 && /not found|not supported|unknown (model|name)/i.test(body)))
+        && model !== FALLBACK_MODEL) {
+      return attemptRender({ prompt, photos, ratio, model: FALLBACK_MODEL }, attempt);
+    }
     // A model that doesn't know the aspect field rejects the whole request;
     // the render matters more than the framing, so drop the config and go on.
     if (res.status === 400 && ratio && /image_?config|aspect_?ratio/i.test(body)) {
-      return attemptRender({ prompt, photos, ratio: null }, attempt);
+      return attemptRender({ prompt, photos, ratio: null, model }, attempt);
     }
     if (res.status === 400 && /API key|API_KEY/i.test(body)) throw new AIError('bad_gkey', body);
     if (res.status === 401 || res.status === 403) throw new AIError('bad_gkey', body);
@@ -123,13 +132,13 @@ async function attemptRender({ prompt, photos, ratio }, attempt) {
       if (/free_tier|"quotaValue"\s*:\s*"0"|limit:\s*0/i.test(body)) throw new AIError('gquota', body);
       if (attempt < 3) {
         await sleep(1500 * (attempt + 1));
-        return attemptRender({ prompt, photos, ratio }, attempt + 1);
+        return attemptRender({ prompt, photos, ratio, model }, attempt + 1);
       }
       throw new AIError('rate_limit', body);
     }
     if (res.status >= 500 && attempt < 2) {
       await sleep(2000);
-      return attemptRender({ prompt, photos, ratio }, attempt + 1);
+      return attemptRender({ prompt, photos, ratio, model }, attempt + 1);
     }
     throw new AIError('http_' + res.status, body);
   }

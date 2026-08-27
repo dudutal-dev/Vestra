@@ -171,6 +171,8 @@ export function tryOnPrompt({ look, items = [], occasion = null, body = null } =
       + 'ignore them entirely and take only the garment. The only person in the result is the person in the main photograph.');
   }
   notes.push('Return the same framing as the main photograph: the full figure, head to toe, with the face fully visible. Never crop the head out of frame.');
+  notes.push('Identity check before returning: the person in the result must be recognisably the SAME person as in the '
+    + 'main photograph — same face, same features, same skin tone, same hair. A beautiful image of a different person is a failed result.');
   notes.push('The clothes must sit on the body as real cloth: correct drape, folds where the fabric '
     + 'gathers, contact shadows where it meets the body, and the hem falling where the garment length says it should.');
   if (look?.silhouette_en) notes.push(`The intended silhouette: ${look.silhouette_en}`);
@@ -308,6 +310,9 @@ export function fullBrief({
   if (occasion) out.push('', `The occasion is ${enOcc(occasion)}.`);
 
   out.push('', 'WHAT MUST NOT CHANGE', PRESERVE);
+  out.push('Identity check before returning: the person in the result must be recognisably the SAME person '
+    + 'as in Photo 1 — same face, same features, same skin tone, same hair. '
+    + 'A beautiful image of a different person is a failed result.');
   // A makeup-only brief may sit on a face photo, where "head to toe" is nonsense.
   out.push(clothes.length
     ? 'Return the same framing as Photo 1: the full figure, head to toe, with the face fully visible. Never crop the head out of frame.'

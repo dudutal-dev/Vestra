@@ -22,7 +22,7 @@ import { t, isHe, pick } from '../i18n.js';
 import { state } from '../state.js';
 import { makeupPrompt, tryOnPrompt, tryOnAttachments, fullBrief } from '../prompt.js';
 import { subName } from '../taxonomy.js';
-import { hasGoogleKey } from '../store.js';
+import { hasGoogleKey, bumpRenderCount } from '../store.js';
 import { renderImage } from '../gemini.js';
 import { errText } from '../ai.js';
 import { addRenders } from './renders.js';
@@ -256,6 +256,7 @@ export function openBrief({ kind, prompt, photos = [], look = null }) {
            Give it the one the render was filed under, or the next "save look"
            tap would shelve the same look twice. */
         if (look && rec) { look.id = rec.id; look.createdAt = rec.createdAt; look.renders = rec.renders; }
+        bumpRenderCount();
         preview.replaceChildren(
           el('div', { class: 'eyebrow', style: { margin: 'var(--s3) 0 var(--s2)' }, text: t('brief_render_done') }),
           el('img', { src: shot.dataUrl, alt: '',
