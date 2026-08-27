@@ -256,11 +256,13 @@ export function fullBrief({
     manifest.push(`Photo ${photos.length} — ${a.name_en}, one of the garments to put on them.`);
   }
 
-  // A separate, closer photograph of the face makes the makeup land; without
-  // one the model works from whatever resolution the full-length shot gives it.
-  if (faceCloseUp && faceCloseUp !== subject && products.length) {
+  // A separate, closer photograph of the face anchors the identity — the one
+  // thing a render is worthless without — and gives the makeup real resolution
+  // to land on. Attached whenever it exists, makeup or not.
+  if (faceCloseUp && faceCloseUp !== subject) {
     photos.push({ role: 'face', label_en: 'the face, close up', dataUrl: faceCloseUp, filename: 'vestra-face.jpg' });
-    manifest.push(`Photo ${photos.length} — the same person's face, closer. Reference for the makeup only; the result is Photo 1.`);
+    manifest.push(`Photo ${photos.length} — the same person's face, closer. Use it to keep the face in the result `
+      + `identical to this person${products.length ? ' and as the reference for the makeup' : ''}; the result is Photo 1.`);
   }
 
   const out = [
