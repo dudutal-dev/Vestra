@@ -127,8 +127,10 @@ export const Settings = {
   set model(v)  { localStorage.setItem('vestra.model', v); },
   get googleKey()  { return localStorage.getItem('vestra.gkey') || ''; },
   set googleKey(v) { v ? localStorage.setItem('vestra.gkey', v) : localStorage.removeItem('vestra.gkey'); },
-  // gemini-2.5-flash-image retires Oct 2026; a stored override outlives it.
-  get imageModel()  { return localStorage.getItem('vestra.gmodel') || 'gemini-2.5-flash-image'; },
+  // Nano Banana 2 — Google's recommended successor, markedly better at keeping
+  // one identity across several reference images, which is this app's whole
+  // use case. A stored override outlives any default change.
+  get imageModel()  { return localStorage.getItem('vestra.gmodel') || 'gemini-3.1-flash-image'; },
   set imageModel(v) { v ? localStorage.setItem('vestra.gmodel', v) : localStorage.removeItem('vestra.gmodel'); },
   get theme()   { return localStorage.getItem('vestra.theme') || 'light'; },
   set theme(v)  { localStorage.setItem('vestra.theme', v); document.documentElement.dataset.theme = v; },
@@ -140,6 +142,28 @@ export const Settings = {
 
 export const hasKey = () => Settings.apiKey.trim().length > 10;
 export const hasGoogleKey = () => Settings.googleKey.trim().length > 10;
+
+/* ---------------- Render spend counter ----------------
+   Local estimate only — the official number lives in Google's billing
+   console. Counts per calendar month, resets itself when the month turns. */
+const RSTATS_KEY = 'vestra.rstats';
+const monthNow = () => new Date().toISOString().slice(0, 7);
+
+export function bumpRenderCount() {
+  let s;
+  try { s = JSON.parse(localStorage.getItem(RSTATS_KEY)) || {}; } catch { s = {}; }
+  if (s.m !== monthNow()) s = { m: monthNow(), n: 0 };
+  s.n += 1;
+  localStorage.setItem(RSTATS_KEY, JSON.stringify(s));
+  return s.n;
+}
+
+export function renderCountThisMonth() {
+  try {
+    const s = JSON.parse(localStorage.getItem(RSTATS_KEY));
+    return s?.m === monthNow() ? (s.n || 0) : 0;
+  } catch { return 0; }
+}
 
 /* ---------------- IDs ---------------- */
 let _seq = 0;

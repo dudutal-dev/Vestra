@@ -6,13 +6,13 @@ import { el, icon, esc, toast, confirmSheet, openSheet, observeReveal, $ } from 
 import { t, isHe, setLang, lang } from '../i18n.js';
 import { state, refreshAll, refreshMedia } from '../state.js';
 import {
-  getProfile, setProfile, Settings, Media, exportAll, importAll, wipeAll, closetScore, hasKey, hasGoogleKey,
+  getProfile, setProfile, Settings, Media, exportAll, importAll, wipeAll, closetScore, hasKey, hasGoogleKey, renderCountThisMonth,
 } from '../store.js';
 import { BODY_SHAPES, COLOR_SEASONS, ARCHETYPES, lbl } from '../taxonomy.js';
 import { loadDemoWardrobe, removeDemoWardrobe, countDemo, DEMO_SIZE } from '../demo.js';
 
 /* Bumped by hand when something ships that the owner would notice. */
-const APP_VERSION = '1.4 · F/W 26-27';
+const APP_VERSION = '1.5 · F/W 26-27';
 
 export function renderProfile(root, ctx) {
   const p = { ...getProfile() };
@@ -192,6 +192,12 @@ export function renderProfile(root, ctx) {
             style: { color: 'var(--oxblood)', textDecoration: 'none' },
             text: t('p_get_gkey') + ' →',
           }),
+          /* A local estimate, not Google's ledger — but close enough to know
+             whether this month cost half a shekel or a whole one. */
+          renderCountThisMonth() > 0 ? el('p', {
+            class: 'micro muted', style: { margin: 0 },
+            text: `${t('p_rcount')}: ${renderCountThisMonth()} · ≈ $${(renderCountThisMonth() * 0.067).toFixed(2)}`,
+          }) : null,
         )),
 
         field(t('p_model'), el('select', {
