@@ -16,7 +16,7 @@
    cache-first, which is where the offline speed actually comes from.
    ============================================================ */
 
-const VERSION = 'vestra-v11';
+const VERSION = 'vestra-v12';
 const SHELL = [
   './',
   './index.html',
@@ -32,6 +32,7 @@ const SHELL = [
   './js/taxonomy.js',
   './js/ui.js',
   './js/ai.js',
+  './js/gemini.js',
   './js/vision.js',
   './js/stylist.js',
   './js/makeup.js',

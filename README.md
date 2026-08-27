@@ -93,6 +93,8 @@ The brief names each product by where it sits rather than what it is called, car
 
 Copy it, attach the photos, and run it wherever you already have an image model — a Claude conversation with an image connector, for instance. VESTRA is a static site with no server, so it writes the brief rather than running the render; nothing leaves your device until you attach it yourself.
 
+**Or let the app run it.** Add a Google AI key in settings and the brief screen grows a **Render it now** button: the same instruction and the same photographs go from your browser straight to Google's image model (Gemini 2.5 Flash Image), and the picture that comes back is saved onto the look automatically. Same architecture as the Claude key — your key, your device, no server of ours in between. Costs about $0.04 a picture, with Google's free tier covering light personal use; the manual brief stays as the free route.
+
 ### 🧪 A sample wardrobe to try it against
 **Profile → Load sample wardrobe** drops in a 25-piece capsule spanning formality 2 to 6, so the Studio can close a look and the health report has something to count before you have photographed anything of your own. The garments are drawn by the app rather than shipped as files — laid flat on a plain ground, which is the same shot the guide asks you for and the same one the try-on's cutout expects. One tap removes them again, and nothing you added yourself is touched.
 

@@ -102,6 +102,8 @@
 
 > ⚠️ **על ההדמייה:** הדמיית האיפור מציירת על אזורי הפנים שזוהו — קירוב מדויק לצורך המחשה, לא צילום. תצוגת הבגדים ממקמת את הפריטים על אזורי הגוף — זו המחשה סטיילינגית, לא הדמייה פוטוריאליסטית.
 
+> ✨ **רוצים צילום אמיתי?** במסך הבריף אפשר לייצר הדמיה פוטוריאליסטית בלחיצה אחת — מוסיפים מפתח Google AI בהגדרות (aistudio.google.com/apikey), והבריף עם התמונות נשלח ישירות מהדפדפן למודל התמונות של Google. התוצאה נשמרת אוטומטית על הלוק. עלות: כ-$0.04 (~13 אג׳) לתמונה, עם שכבת חינם. בלי מפתח — הבריף הידני ממשיך לעבוד כרגיל, בחינם.
+
 ---
 
 ## 4 · הסטודיו — לב האפליקציה
@@ -305,6 +307,8 @@ Manual cataloging works fully — a form with every field. Slower, but the styli
 > 🔒 **Privacy:** photos are stored in IndexedDB on your device only. They are sent to Anthropic **only** the moment you press "Analyze", and are not retained there. Delete them any time from your profile.
 
 > ⚠️ **About the simulation:** the makeup preview paints onto detected facial regions — a careful approximation for guidance, not a photograph. The try-on positions your pieces over detected body regions — a styling illustration, not a photorealistic render.
+
+> ✨ **Want an actual photograph?** The brief screen can render one in a single tap — add a Google AI key in settings (aistudio.google.com/apikey) and the brief plus its photographs go straight from your browser to Google's image model. The result is saved onto the look automatically. About $0.04 a picture, with a free tier; without a key, the manual brief keeps working for free.
 
 ---
 
