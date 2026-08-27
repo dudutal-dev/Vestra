@@ -131,17 +131,27 @@ export function renderLookCard(look, { onSave, onBeauty, saved, onDelete } = {})
 /* ---------------- Compact card for the home screen ---------------- */
 export function renderLookMini(look, onOpen) {
   const items = (look.items || []).map(r => itemById(r.id)).filter(Boolean);
+  // Once a look has a photograph of itself worn, that photograph IS the look —
+  // the newest render leads the card, and the garment thumbs stand in only
+  // until one exists.
+  const render = (look.renders || []).at(-1);
   return el('button', {
     class: 'card card-lift', style: { width: '210px', textAlign: 'start' },
     onclick: () => onOpen?.(look),
   },
-    el('div', { class: 'row g1', style: { marginBottom: '10px' } },
-      items.slice(0, 4).map(i => i.thumb
-        ? el('img', { src: i.thumb, alt: '', loading: 'lazy',
-            style: { width: '38px', height: '48px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--line)' } })
-        : el('div', { style: { width: '38px', height: '48px', display: 'grid', placeItems: 'center',
-            background: 'var(--cloud-3)', borderRadius: '8px' }, text: catIcon(i.category) })),
-    ),
+    render
+      ? el('img', {
+          src: render.dataUrl, alt: '', loading: 'lazy',
+          style: { width: '100%', aspectRatio: '3/4', objectFit: 'cover', objectPosition: 'top',
+                   borderRadius: '10px', display: 'block', marginBottom: '10px' },
+        })
+      : el('div', { class: 'row g1', style: { marginBottom: '10px' } },
+          items.slice(0, 4).map(i => i.thumb
+            ? el('img', { src: i.thumb, alt: '', loading: 'lazy',
+                style: { width: '38px', height: '48px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--line)' } })
+            : el('div', { style: { width: '38px', height: '48px', display: 'grid', placeItems: 'center',
+                background: 'var(--cloud-3)', borderRadius: '8px' }, text: catIcon(i.category) })),
+        ),
     el('div', { class: 'slot-name', text: pick(look, 'title') || t('look_ready') }),
     el('div', { class: 'micro muted', text: pick(look, 'occasion') || new Date(look.createdAt || Date.now()).toLocaleDateString(isHe() ? 'he-IL' : 'en-GB') }),
   );

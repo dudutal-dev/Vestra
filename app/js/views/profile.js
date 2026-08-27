@@ -12,7 +12,7 @@ import { BODY_SHAPES, COLOR_SEASONS, ARCHETYPES, lbl } from '../taxonomy.js';
 import { loadDemoWardrobe, removeDemoWardrobe, countDemo, DEMO_SIZE } from '../demo.js';
 
 /* Bumped by hand when something ships that the owner would notice. */
-const APP_VERSION = '1.6 · F/W 26-27';
+const APP_VERSION = '1.6.1 · F/W 26-27';
 
 export function renderProfile(root, ctx) {
   const p = { ...getProfile() };
