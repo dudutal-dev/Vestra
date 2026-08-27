@@ -187,8 +187,10 @@ async function shareEverything(text, files) {
  * @param photos [{ label, dataUrl, filename }] — the references it mentions
  * @param look   the look the render belongs to, so the picture that comes back
  *               lands on it. May be unsaved — attaching the render saves it.
+ * @param makeup the beauty look, when there is one — powers the face render
+ *               button and the printed steps.
  */
-export function openBrief({ kind, prompt, photos = [], look = null }) {
+export function openBrief({ kind, prompt, photos = [], look = null, makeup = null, intensity = 1 }) {
   if (!prompt) {
     toast(t('brief_nothing'), 'warn');
     return;
@@ -273,6 +275,69 @@ export function openBrief({ kind, prompt, photos = [], look = null }) {
     },
   }) : null;
 
+  /* The outfit render shows makeup the way a full-length photo does — barely.
+     The face is where makeup reads, so it gets a render of its own: the
+     makeup instruction applied to the face close-up, filed onto the same
+     look. Only offered where there is a face photo to work on. */
+  const facePreview = el('div');
+  const makeupSteps = (makeup?.steps || []).filter(s => s.instruction_he || s.instruction_en);
+  let faceRendering = false;
+  const faceBtn = canRender && kind === 'full' && makeupSteps.length && state.face?.photo ? el('button', {
+    class: 'btn btn-quiet btn-block', style: { marginTop: 'var(--s2)' },
+    html: icon('sparkles') + `<span>${esc(t('brief_render_face'))}</span>`,
+    onclick: async (e) => {
+      if (faceRendering) return;
+      faceRendering = true;
+      const btn = e.currentTarget;
+      const label = btn.querySelector('span');
+      btn.disabled = true;
+      label.textContent = t('brief_rendering');
+      try {
+        const shot = await renderImage({
+          prompt: makeupPrompt({ look: makeup, face: state.face?.face || null, intensity }),
+          photos: [{ dataUrl: state.face.photo }],
+        });
+        const rec = await addRenders(look || {
+          engine: 'photo',
+          title_he: 'הדמיית איפור', title_en: 'Makeup render',
+          occasion_he: '', occasion_en: '',
+          items: [], palette: [], gaps: [],
+        }, [shot]);
+        if (look && rec) { look.id = rec.id; look.createdAt = rec.createdAt; look.renders = rec.renders; }
+        bumpRenderCount();
+        facePreview.replaceChildren(
+          el('div', { class: 'eyebrow', style: { margin: 'var(--s3) 0 var(--s2)' }, text: t('brief_render_done') }),
+          el('img', { src: shot.dataUrl, alt: '',
+            style: { width: '100%', borderRadius: 'var(--r-md)', display: 'block' } }),
+        );
+        buzz(14);
+        toast(t('brief_render_done'));
+      } catch (err) {
+        toast(errText(err), 'warn');
+      }
+      label.textContent = t('brief_render_face');
+      btn.disabled = false;
+      faceRendering = false;
+    },
+  }) : null;
+
+  /* The steps are the half of the makeup that survives leaving the house —
+     what to put where. They were locked away in the beauty tab; a person
+     holding the render should not have to go looking for them. */
+  const stepsBlock = makeupSteps.length ? el('div', { style: { marginTop: 'var(--s5)' } },
+    el('div', { class: 'eyebrow', text: t('brief_makeup_steps') + (pick(makeup, 'look_name') ? ` · ${pick(makeup, 'look_name')}` : '') }),
+    el('ol', { class: 'tiny', style: { paddingInlineStart: '18px', margin: 'var(--s3) 0 0', lineHeight: 1.6 } },
+      makeupSteps.map(s => el('li', { style: { marginBottom: '6px' } },
+        s.shade_hex ? el('span', { style: {
+          display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%',
+          background: s.shade_hex, border: '1px solid rgba(0,0,0,.18)',
+          marginInlineEnd: '6px',
+        } }) : null,
+        el('span', { text: pick(s, 'instruction')
+          + (pick(s, 'product_type') ? ` — ${pick(s, 'product_type')}` : '') }),
+      ))),
+  ) : null;
+
   /* Whatever the share does, the owner is told what happened to the copy.
      That is the half of the handover this screen can actually be sure about,
      and the half that decides whether there is anything to paste — a silent
@@ -324,6 +389,8 @@ export function openBrief({ kind, prompt, photos = [], look = null }) {
 
     renderBtn,
     preview,
+    faceBtn,
+    facePreview,
     renderBtn ? el('div', { style: { height: 'var(--s3)' } })
       // No key yet — one quiet line saying the button exists and what it costs.
       : el('p', { class: 'micro muted', style: { marginBottom: 'var(--s3)' }, text: t('brief_render_hint') }),
@@ -336,6 +403,7 @@ export function openBrief({ kind, prompt, photos = [], look = null }) {
     shareAllBtn,
     shareAllBtn ? el('div', { style: { height: 'var(--s3)' } }) : null,
     copyBtn,
+    stepsBlock,
     el('div', { style: { marginTop: 'var(--s3)' } }, field),
 
     photos.length ? el('div', { style: { marginTop: 'var(--s5)' } },
@@ -385,6 +453,8 @@ export function openMakeupBrief(look, { intensity = 1 } = {}) {
     kind: 'makeup',
     prompt: makeupPrompt({ look, face: rec?.face || null, intensity }),
     photos,
+    makeup: look,
+    intensity,
     // A beauty look is not a look record; a render of it is filed under a
     // fresh photo-look named after it, the way newLookFromImages does.
     look: {
@@ -471,6 +541,8 @@ export function openFullBrief(look, { makeup = null, intensity = 1 } = {}) {
     kind: 'full',
     prompt: built.text,
     look,
+    makeup,
+    intensity,
     photos: built.photos.map(p => ({
       label: p.role === 'subject' ? (isHe() ? 'את/ה' : 'the person')
         : p.role === 'face' ? (isHe() ? 'הפנים' : 'the face')
