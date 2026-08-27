@@ -2,7 +2,7 @@
    VESTRA · Profile & settings
    ============================================================ */
 
-import { el, icon, esc, toast, confirmSheet, openSheet, observeReveal, $ } from '../ui.js';
+import { el, icon, esc, toast, buzz, confirmSheet, openSheet, observeReveal, $ } from '../ui.js';
 import { t, isHe, setLang, lang } from '../i18n.js';
 import { state, refreshAll, refreshMedia } from '../state.js';
 import {
@@ -12,7 +12,7 @@ import { BODY_SHAPES, COLOR_SEASONS, ARCHETYPES, lbl } from '../taxonomy.js';
 import { loadDemoWardrobe, removeDemoWardrobe, countDemo, DEMO_SIZE } from '../demo.js';
 
 /* Bumped by hand when something ships that the owner would notice. */
-const APP_VERSION = '1.5 · F/W 26-27';
+const APP_VERSION = '1.5.1 · F/W 26-27';
 
 export function renderProfile(root, ctx) {
   const p = { ...getProfile() };
@@ -194,11 +194,28 @@ export function renderProfile(root, ctx) {
           }),
           /* A local estimate, not Google's ledger — but close enough to know
              whether this month cost half a shekel or a whole one. */
-          renderCountThisMonth() > 0 ? el('p', {
+          hasGoogleKey() ? el('p', {
             class: 'micro muted', style: { margin: 0 },
             text: `${t('p_rcount')}: ${renderCountThisMonth()} · ≈ $${(renderCountThisMonth() * 0.067).toFixed(2)}`,
           }) : null,
         )),
+
+        /* Update on demand. The service worker already skips waiting and
+           claims clients, so a fresh registration takes over on its own —
+           this button just asks for it now instead of on the next visit. */
+        el('button', {
+          class: 'btn btn-quiet btn-block btn-sm', style: { marginTop: 'var(--s3)' },
+          html: icon('refresh') + `<span>${esc(t('p_refresh'))} · ${esc(APP_VERSION.split(' ')[0])}</span>`,
+          onclick: async (e) => {
+            e.currentTarget.disabled = true;
+            buzz(12);
+            try {
+              const regs = await navigator.serviceWorker?.getRegistrations?.() || [];
+              await Promise.all(regs.map(r => r.update().catch(() => {})));
+            } catch { /* no SW — the reload alone still refetches everything */ }
+            location.reload();
+          },
+        }),
 
         field(t('p_model'), el('select', {
           class: 'select', onchange: e => { Settings.model = e.target.value; },
