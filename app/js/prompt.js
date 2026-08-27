@@ -165,7 +165,12 @@ export function tryOnPrompt({ look, items = [], occasion = null, body = null } =
       `${withPhotos.length} garment photograph${withPhotos.length > 1 ? 's are' : ' is'} attached. `
       + 'Reproduce those exact garments — their colour, fabric, cut and any detail — rather than '
       + 'inventing something similar. The written description is there to disambiguate the photograph, not to replace it.');
+    // Catalog shots come with a model in them, and a model with a better-lit
+    // photo is exactly who an image model promotes to subject. Rule it out.
+    notes.push('Any person or mannequin appearing in a garment photograph is a store model, not the subject — '
+      + 'ignore them entirely and take only the garment. The only person in the result is the person in the main photograph.');
   }
+  notes.push('Return the same framing as the main photograph: the full figure, head to toe, with the face fully visible. Never crop the head out of frame.');
   notes.push('The clothes must sit on the body as real cloth: correct drape, folds where the fabric '
     + 'gathers, contact shadows where it meets the body, and the hem falling where the garment length says it should.');
   if (look?.silhouette_en) notes.push(`The intended silhouette: ${look.silhouette_en}`);
@@ -263,6 +268,11 @@ export function fullBrief({
     '',
     'PHOTOGRAPHS',
     ...manifest,
+    // Catalog garment shots come with a model in them, and a model with a
+    // better-lit photo is exactly who an image model promotes to subject.
+    ...(attached.length ? ['Only Photo 1 shows the subject. Any person or mannequin appearing in a '
+      + 'garment photograph is a store model — ignore them entirely and take only the garment. '
+      + 'The only person in the result is the person from Photo 1.'] : []),
     '',
     'WHAT TO CHANGE',
   ];
@@ -296,6 +306,10 @@ export function fullBrief({
   if (occasion) out.push('', `The occasion is ${enOcc(occasion)}.`);
 
   out.push('', 'WHAT MUST NOT CHANGE', PRESERVE);
+  // A makeup-only brief may sit on a face photo, where "head to toe" is nonsense.
+  out.push(clothes.length
+    ? 'Return the same framing as Photo 1: the full figure, head to toe, with the face fully visible. Never crop the head out of frame.'
+    : 'Return the same framing as Photo 1, with the face fully visible — never cropped out of frame.');
   if (clothes.length) out.push('Do not add any garment or accessory that is not listed above.');
 
   return { text: out.join('\n'), photos };
