@@ -71,7 +71,8 @@ export function matchingLooks(occasion, looks = state.looks, limit = 4) {
 
 /** One tile: the render if there is one, the pieces if there is not. */
 export function lookTile(look, onOpen) {
-  const render = (look.renders || [])[0];
+  // The newest render — later ones are the corrected takes.
+  const render = (look.renders || []).at(-1);
   const items = (look.items || []).map(r => itemById(r.id)).filter(Boolean);
 
   return el('button', {
