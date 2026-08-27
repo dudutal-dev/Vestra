@@ -68,6 +68,11 @@ export async function renderImage({ prompt, photos = [] }, attempt = 0) {
     if (res.status === 400 && /API key|API_KEY/i.test(body)) throw new AIError('bad_gkey', body);
     if (res.status === 401 || res.status === 403) throw new AIError('bad_gkey', body);
     if (res.status === 429) {
+      // Google's free tier includes NO image generation at all — the quota for
+      // these models is 0, so a keyed account with no billing gets a 429 on the
+      // very first call. That is not a rate limit and no retry will fix it;
+      // the owner needs to enable billing, and the error should say so.
+      if (/free_tier|"quotaValue"\s*:\s*"0"|limit:\s*0/i.test(body)) throw new AIError('gquota', body);
       if (attempt < 3) {
         await sleep(1500 * (attempt + 1));
         return renderImage({ prompt, photos }, attempt + 1);
