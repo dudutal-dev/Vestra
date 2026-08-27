@@ -230,10 +230,16 @@ export function openBrief({ kind, prompt, photos = [], look = null }) {
      lands on the look it was made for. The manual handover below survives as
      the free path and the second opinion. */
   const preview = el('div');
+  /* `disabled` covers a tap while a render is running; this covers the tap
+     that isn't one — mobile browsers can synthesise a second click from one
+     touch (the classic ghost click), and each render here costs money. */
+  let rendering = false;
   const renderBtn = canRender ? el('button', {
     class: 'btn btn-primary btn-block',
     html: icon('sparkles') + `<span>${esc(t('brief_render_now'))}</span>`,
     onclick: async (e) => {
+      if (rendering) return;
+      rendering = true;
       const btn = e.currentTarget;
       const label = btn.querySelector('span');
       btn.disabled = true;
@@ -262,6 +268,7 @@ export function openBrief({ kind, prompt, photos = [], look = null }) {
       }
       label.textContent = t('brief_render_now');
       btn.disabled = false;
+      rendering = false;
     },
   }) : null;
 
