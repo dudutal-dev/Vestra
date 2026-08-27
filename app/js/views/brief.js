@@ -22,6 +22,10 @@ import { t, isHe, pick } from '../i18n.js';
 import { state } from '../state.js';
 import { makeupPrompt, tryOnPrompt, tryOnAttachments, fullBrief } from '../prompt.js';
 import { subName } from '../taxonomy.js';
+import { hasGoogleKey } from '../store.js';
+import { renderImage } from '../gemini.js';
+import { errText } from '../ai.js';
+import { addRenders } from './renders.js';
 
 /** Copy text, falling back to a selectable field where the clipboard is blocked. */
 async function copyText(text, field) {
@@ -181,8 +185,10 @@ async function shareEverything(text, files) {
  * @param kind   'makeup' | 'tryon'
  * @param prompt the instruction text
  * @param photos [{ label, dataUrl, filename }] — the references it mentions
+ * @param look   the look the render belongs to, so the picture that comes back
+ *               lands on it. May be unsaved — attaching the render saves it.
  */
-export function openBrief({ kind, prompt, photos = [] }) {
+export function openBrief({ kind, prompt, photos = [], look = null }) {
   if (!prompt) {
     toast(t('brief_nothing'), 'warn');
     return;
@@ -194,10 +200,12 @@ export function openBrief({ kind, prompt, photos = [] }) {
     value: prompt,
   });
 
+  const canRender = hasGoogleKey();
+
   const copyBtn = el('button', {
     // Quiet once sharing is on the screen: the share carries the photographs
     // too, and copying the text alone leaves the owner to find them.
-    class: photos.length && navigator.share ? 'btn btn-ghost btn-block' : 'btn btn-primary btn-block',
+    class: canRender || (photos.length && navigator.share) ? 'btn btn-ghost btn-block' : 'btn btn-primary btn-block',
     html: icon('download') + `<span>${esc(t('brief_copy'))}</span>`,
     onclick: async () => {
       const done = await copyText(prompt, field);
@@ -215,6 +223,54 @@ export function openBrief({ kind, prompt, photos = [] }) {
       .then(f => { files = f; })
       .catch(() => { files = null; });
   }
+
+  /* The in-app render. With a Google key on file the brief doesn't have to
+     leave: the same text and the same photographs, in the same order the
+     manifest numbers them, go to the image model directly, and the picture
+     lands on the look it was made for. The manual handover below survives as
+     the free path and the second opinion. */
+  const preview = el('div');
+  /* `disabled` covers a tap while a render is running; this covers the tap
+     that isn't one — mobile browsers can synthesise a second click from one
+     touch (the classic ghost click), and each render here costs money. */
+  let rendering = false;
+  const renderBtn = canRender ? el('button', {
+    class: 'btn btn-primary btn-block',
+    html: icon('sparkles') + `<span>${esc(t('brief_render_now'))}</span>`,
+    onclick: async (e) => {
+      if (rendering) return;
+      rendering = true;
+      const btn = e.currentTarget;
+      const label = btn.querySelector('span');
+      btn.disabled = true;
+      label.textContent = t('brief_rendering');
+      try {
+        const shot = await renderImage({ prompt, photos });
+        const rec = await addRenders(look || {
+          engine: 'photo',
+          title_he: 'הדמיה', title_en: 'Render',
+          occasion_he: '', occasion_en: '',
+          items: [], palette: [], gaps: [],
+        }, [shot]);
+        /* The caller's copy of an unsaved look has no id until this moment.
+           Give it the one the render was filed under, or the next "save look"
+           tap would shelve the same look twice. */
+        if (look && rec) { look.id = rec.id; look.createdAt = rec.createdAt; look.renders = rec.renders; }
+        preview.replaceChildren(
+          el('div', { class: 'eyebrow', style: { margin: 'var(--s3) 0 var(--s2)' }, text: t('brief_render_done') }),
+          el('img', { src: shot.dataUrl, alt: '',
+            style: { width: '100%', borderRadius: 'var(--r-md)', display: 'block' } }),
+        );
+        buzz(14);
+        toast(t('brief_render_done'));
+      } catch (err) {
+        toast(errText(err), 'warn');
+      }
+      label.textContent = t('brief_render_now');
+      btn.disabled = false;
+      rendering = false;
+    },
+  }) : null;
 
   /* Whatever the share does, the owner is told what happened to the copy.
      That is the half of the handover this screen can actually be sure about,
@@ -235,7 +291,8 @@ export function openBrief({ kind, prompt, photos = [] }) {
   };
 
   const shareBtn = photos.length && navigator.share ? el('button', {
-    class: 'btn btn-primary btn-block',
+    // Second place once the render happens in-app.
+    class: renderBtn ? 'btn btn-ghost btn-block' : 'btn btn-primary btn-block',
     html: icon('upload') + `<span>${esc(t('brief_share'))}</span>`,
     onclick: async (e) => {
       const btn = e.currentTarget;
@@ -262,8 +319,13 @@ export function openBrief({ kind, prompt, photos = [] }) {
     el('div', { class: 'eyebrow', text: kind === 'makeup' ? t('brief_makeup') : kind === 'full' ? t('brief_full') : t('brief_tryon') }),
     el('h3', { style: { marginBlock: '6px var(--s3)' }, text: t('brief_title') }),
     el('p', { class: 'tiny muted', style: { marginBottom: 'var(--s4)' },
-      text: shareBtn ? t('brief_share_how') : t('brief_how') }),
+      text: renderBtn ? t('brief_render_how') : shareBtn ? t('brief_share_how') : t('brief_how') }),
 
+    renderBtn,
+    preview,
+    renderBtn ? el('div', { style: { height: 'var(--s3)' } })
+      // No key yet — one quiet line saying the button exists and what it costs.
+      : el('p', { class: 'micro muted', style: { marginBottom: 'var(--s3)' }, text: t('brief_render_hint') }),
     shareBtn,
     shareBtn ? el('ol', { class: 'micro muted', style: { margin: 'var(--s2) 0 var(--s3)', paddingInlineStart: '18px' } },
       el('li', { text: t('brief_step1') }),
@@ -322,6 +384,16 @@ export function openMakeupBrief(look, { intensity = 1 } = {}) {
     kind: 'makeup',
     prompt: makeupPrompt({ look, face: rec?.face || null, intensity }),
     photos,
+    // A beauty look is not a look record; a render of it is filed under a
+    // fresh photo-look named after it, the way newLookFromImages does.
+    look: {
+      engine: 'photo',
+      title_he: look?.look_name_he || 'הדמיית איפור',
+      title_en: look?.look_name_en || 'Makeup render',
+      occasion_he: '', occasion_en: '',
+      items: [], palette: [], gaps: [],
+      makeup_look: look?.look_key || null,
+    },
   });
 }
 
@@ -355,6 +427,7 @@ export function openTryOnBrief(look) {
       body: rec?.body || null,
     }),
     photos,
+    look,
   });
 }
 
@@ -396,6 +469,7 @@ export function openFullBrief(look, { makeup = null, intensity = 1 } = {}) {
   openBrief({
     kind: 'full',
     prompt: built.text,
+    look,
     photos: built.photos.map(p => ({
       label: p.role === 'subject' ? (isHe() ? 'את/ה' : 'the person')
         : p.role === 'face' ? (isHe() ? 'הפנים' : 'the face')

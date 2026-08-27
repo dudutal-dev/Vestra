@@ -59,6 +59,7 @@ export class AIError extends Error {
   get message_key() {
     return {
       no_key: 'no_key_t', bad_key: 'err_key', rate_limit: 'err_rate',
+      no_gkey: 'no_gkey_t', bad_gkey: 'err_gkey',
       bad_image: 'err_image', parse: 'err_parse', offline: 'err_network',
       unclear_photo: 'err_unclear', refusal: 'err_generic',
     }[this.code] || 'err_generic';

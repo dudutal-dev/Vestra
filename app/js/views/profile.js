@@ -6,7 +6,7 @@ import { el, icon, esc, toast, confirmSheet, openSheet, observeReveal, $ } from 
 import { t, isHe, setLang, lang } from '../i18n.js';
 import { state, refreshAll, refreshMedia } from '../state.js';
 import {
-  getProfile, setProfile, Settings, Media, exportAll, importAll, wipeAll, closetScore, hasKey,
+  getProfile, setProfile, Settings, Media, exportAll, importAll, wipeAll, closetScore, hasKey, hasGoogleKey,
 } from '../store.js';
 import { BODY_SHAPES, COLOR_SEASONS, ARCHETYPES, lbl } from '../taxonomy.js';
 import { loadDemoWardrobe, removeDemoWardrobe, countDemo, DEMO_SIZE } from '../demo.js';
@@ -176,6 +176,21 @@ export function renderProfile(root, ctx) {
             target: '_blank', rel: 'noopener noreferrer',
             style: { color: 'var(--oxblood)', textDecoration: 'none' },
             text: t('p_get_key') + ' →',
+          }),
+        )),
+
+        field(t('p_gkey'), el('div', { class: 'stack g2' },
+          el('input', {
+            class: 'input', type: 'password', autocomplete: 'off', spellcheck: 'false',
+            placeholder: t('p_gkey_ph'), value: Settings.googleKey,
+            oninput: e => { Settings.googleKey = e.target.value.trim(); },
+          }),
+          el('p', { class: 'micro muted', style: { margin: 0 }, text: t('p_gkey_help') }),
+          el('a', {
+            class: 'micro', href: 'https://aistudio.google.com/apikey',
+            target: '_blank', rel: 'noopener noreferrer',
+            style: { color: 'var(--oxblood)', textDecoration: 'none' },
+            text: t('p_get_gkey') + ' →',
           }),
         )),
 
@@ -452,6 +467,7 @@ export function openAbout() {
 
     el('div', { class: 'card stack g1', style: { marginTop: 'var(--s4)' } },
       line(t('about_engine'), hasKey() ? 'Claude · api.anthropic.com' : t('about_engine_local'), hasKey()),
+      line(t('about_render_engine'), hasGoogleKey() ? `Gemini · ${Settings.imageModel}` : t('about_render_local'), hasGoogleKey()),
       line(t('about_items'), String(state.items.length)),
       line(t('about_looks'), String(state.looks.length)),
       line(t('about_version'), APP_VERSION, true),

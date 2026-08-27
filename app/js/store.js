@@ -125,6 +125,11 @@ export const Settings = {
   set apiKey(v) { v ? localStorage.setItem('vestra.key', v) : localStorage.removeItem('vestra.key'); },
   get model()   { return localStorage.getItem('vestra.model') || 'claude-opus-5'; },
   set model(v)  { localStorage.setItem('vestra.model', v); },
+  get googleKey()  { return localStorage.getItem('vestra.gkey') || ''; },
+  set googleKey(v) { v ? localStorage.setItem('vestra.gkey', v) : localStorage.removeItem('vestra.gkey'); },
+  // gemini-2.5-flash-image retires Oct 2026; a stored override outlives it.
+  get imageModel()  { return localStorage.getItem('vestra.gmodel') || 'gemini-2.5-flash-image'; },
+  set imageModel(v) { v ? localStorage.setItem('vestra.gmodel', v) : localStorage.removeItem('vestra.gmodel'); },
   get theme()   { return localStorage.getItem('vestra.theme') || 'light'; },
   set theme(v)  { localStorage.setItem('vestra.theme', v); document.documentElement.dataset.theme = v; },
   get seen()    { return localStorage.getItem('vestra.seen') === '1'; },
@@ -134,6 +139,7 @@ export const Settings = {
 };
 
 export const hasKey = () => Settings.apiKey.trim().length > 10;
+export const hasGoogleKey = () => Settings.googleKey.trim().length > 10;
 
 /* ---------------- IDs ---------------- */
 let _seq = 0;
