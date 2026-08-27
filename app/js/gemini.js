@@ -73,10 +73,21 @@ export async function renderImage({ prompt, photos = [] }) {
 async function attemptRender({ prompt, photos, ratio }, attempt) {
   if (!navigator.onLine) throw new AIError('offline');
 
-  const parts = [
-    { text: prompt },
-    ...photos.map(p => inlinePart(p.dataUrl)).filter(Boolean),
-  ];
+  /* Order decides whether this is an edit or an invention. With the whole
+     instruction first and the images dumped after it, the model reads a
+     text-to-image request with loose references — and answers with a new
+     person instead of retouching Photo 1. So each image arrives behind its
+     own "Photo N" anchor, matching the numbering the brief's manifest uses,
+     and the instruction comes last, after everything it refers to. This is
+     also the ordering Google documents for image editing. */
+  const parts = [];
+  let n = 0;
+  for (const p of photos) {
+    const img = inlinePart(p.dataUrl);
+    if (!img) continue;
+    parts.push({ text: `Photo ${++n}` }, img);
+  }
+  parts.push({ text: prompt });
 
   const payload = { contents: [{ parts }] };
   if (ratio) payload.generationConfig = { imageConfig: { aspectRatio: ratio } };
