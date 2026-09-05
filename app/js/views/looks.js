@@ -138,6 +138,11 @@ export function lookText(look) {
     look.trend_note_he, look.trend_note_en, look.notes,
   ];
   for (const c of look.palette || []) parts.push(c.name_he, c.name_en);
+  // "the look with the red lip" — the makeup is remembered by its products too.
+  if (look.makeup) {
+    parts.push(look.makeup.look_name_he, look.makeup.look_name_en);
+    for (const s of look.makeup.steps || []) parts.push(s.area, s.ref, s.alt, s.shade_he, s.shade_en);
+  }
   for (const row of look.items || []) {
     parts.push(row.reason_he, row.reason_en);
     const item = itemById(row.id);

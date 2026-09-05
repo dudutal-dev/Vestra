@@ -11,6 +11,7 @@ import { renderMakeup, loadImage } from '../makeup.js';
 import { downloadCanvas } from '../tryon.js';
 import { openMakeupBrief, openFullBrief } from './brief.js';
 import { BEAUTY_LOOKS, OCCASION_BEAUTY, OCCASIONS, occName, lbl } from '../taxonomy.js';
+import { makeupRecord } from './renders.js';
 
 /* Offline reference looks — SKILL.md Module 7.2 / 7.3 */
 /* Offline reference looks — SKILL.md Module 7.2 / 7.3
@@ -408,6 +409,7 @@ export function renderBeauty(root, ctx) {
     try {
       const data = hasKey() ? await beautyLook(payload) : localLook(key);
       state.beauty = data;
+      attach(data);
       paint(data);
       const r = host.getBoundingClientRect();
       sparkle(r.left + r.width / 2, r.top + 40, 12);
@@ -415,14 +417,28 @@ export function renderBeauty(root, ctx) {
       toast(errText(e), 'warn');
       const data = localLook(key);
       state.beauty = data;
+      attach(data);
       paint(data);
     }
+  }
+
+  /* The makeup belongs to the look it was made for. `fromLook` is the studio's
+     own object, so stamping it here means the next "save look" tap shelves the
+     outfit with its face — and a render made from the full brief files the
+     same steps alongside the picture. The intensity is refreshed by the slider
+     below as it moves. */
+  function attach(data, intensity = 1) {
+    if (!fromLook) return;
+    const rec = makeupRecord({ ...data, steps: visibleSteps(data, presentation) }, intensity);
+    if (!rec) return;
+    fromLook.makeup = rec;
+    fromLook.makeup_look = rec.look_key || fromLook.makeup_look || null;
   }
 
   function paint(d) {
     const steps = visibleSteps(d, presentation);
     host.replaceChildren(...[
-      simulationBlock({ ...d, steps }, ctx),
+      simulationBlock({ ...d, steps }, ctx, { onIntensity: (v) => attach(d, v) }),
       faceCard(),
       el('article', { class: 'look-card' },
         el('div', { class: 'look-head' },
@@ -487,7 +503,7 @@ export function renderBeauty(root, ctx) {
 /* ============================================================
    The simulation — paints the look onto the owner's own photo
    ============================================================ */
-function simulationBlock(look, ctx) {
+function simulationBlock(look, ctx, { onIntensity = null } = {}) {
   const rec = state.face;
 
   if (!rec?.photo || !rec.regions) {
@@ -521,7 +537,7 @@ function simulationBlock(look, ctx) {
   const intensityRange = el('input', {
     class: 'slider', type: 'range', min: '0', max: '150', value: '100',
     'aria-label': t('sim_intensity'),
-    oninput: (e) => { intensity = +e.target.value / 100; scheduleDraw(); },
+    oninput: (e) => { intensity = +e.target.value / 100; onIntensity?.(intensity); scheduleDraw(); },
   });
 
   let intensityForBrief = () => intensity;
@@ -586,6 +602,38 @@ function simulationBlock(look, ctx) {
       html: icon('user') + `<span>${esc(t('anchor_fix'))}</span>`,
       onclick: () => ctx.go('anchors'),
     }),
+  );
+}
+
+/**
+ * The steps of a makeup, as they read on a card: shade dot, area, instruction,
+ * product names. Shared with the saved look, which carries the makeup it was
+ * rendered with and should show it the same way the beauty screen does.
+ */
+export function makeupBlock(d) {
+  const steps = d?.steps || [];
+  if (!steps.length) return null;
+  return el('div', { class: 'stack g2' },
+    pick(d, 'look_name') || d.duration_minutes ? el('div', { class: 'row g2', style: { alignItems: 'center' } },
+      pick(d, 'look_name') ? el('span', { class: 'slot-name', text: pick(d, 'look_name') }) : null,
+      d.duration_minutes ? el('span', { class: 'micro muted', text: `${d.duration_minutes} ${t('minutes')}` }) : null,
+    ) : null,
+    el('div', { class: 'stack g2' },
+      steps.map(s => el('div', { class: 'row g2', style: { alignItems: 'flex-start' } },
+        el('span', { class: 'shade-dot', style: { background: s.shade_hex || 'var(--cloud-3)', width: '16px', height: '16px', marginTop: '2px' } }),
+        el('div', { class: 'grow' },
+          el('div', { class: 'micro', style: { textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--ink-3)' }, text: s.area }),
+          el('div', { class: 'tiny', text: pick(s, 'instruction') }),
+          pick(s, 'shade') || pick(s, 'product_type')
+            ? el('div', { class: 'micro muted', text: [pick(s, 'product_type'), pick(s, 'shade')].filter(Boolean).join(' · ') })
+            : null,
+          s.ref ? el('div', { class: 'micro muted' },
+            el('b', { style: { color: 'var(--ink-2)' }, text: s.ref }),
+            s.alt ? el('span', { text: ` · ${t('step_alt')}: ${s.alt}` }) : null,
+          ) : null,
+        ),
+      ))),
+    pick(d, 'longevity_tip') ? el('div', { class: 'micro muted', text: `${t('bt_tip')}: ${pick(d, 'longevity_tip')}` }) : null,
   );
 }
 

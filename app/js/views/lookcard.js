@@ -8,7 +8,7 @@ import { t, pick, isHe } from '../i18n.js';
 import { slotName, catIcon, hexFor } from '../taxonomy.js';
 import { itemById } from '../state.js';
 import { openTryOnBrief, openFullBrief } from './brief.js';
-import { makeupForLook } from './beauty.js';
+import { makeupForLook, makeupBlock } from './beauty.js';
 import { renderStrip } from './renders.js';
 
 const noteBlock = (label, body) => body
@@ -85,6 +85,14 @@ export function renderLookCard(look, { onSave, onBeauty, saved, onDelete } = {})
     noteBlock(t('trend_note'), pick(look, 'trend_note')),
     noteBlock(t('alternative'), pick(look, 'alternative')),
     gaps,
+    /* The makeup this look was rendered with — every step, shade and product
+       name, kept on the look so the face in the render can be reproduced at a
+       mirror. Only a look that actually carries a makeup shows one; the rest
+       are offered the beauty screen below. */
+    look.makeup?.steps?.length ? el('div', { class: 'look-note' },
+      el('span', { class: 'note-label', text: t('look_makeup') }),
+      makeupBlock(look.makeup),
+    ) : null,
     el('div', { class: 'look-note row g2 wrap' },
       onSave ? el('button', {
         class: `btn btn-sm ${saved ? 'btn-ghost' : 'btn-primary'} grow`,
@@ -108,7 +116,12 @@ export function renderLookCard(look, { onSave, onBeauty, saved, onDelete } = {})
     el('button', {
       class: 'btn btn-sm btn-primary btn-block',
       html: icon('sparkles') + `<span>${esc(t('brief_full_open'))}</span>`,
-      onclick: () => openFullBrief(look, { makeup: makeupForLook(look) }),
+      // A saved makeup reopens the exact brief it was rendered from — same
+      // steps, same intensity — rather than the reference look for its key.
+      onclick: () => openFullBrief(look, {
+        makeup: look.makeup?.steps?.length ? look.makeup : makeupForLook(look),
+        intensity: look.makeup?.intensity ?? 1,
+      }),
     }),
     el('button', {
       class: 'btn btn-sm btn-quiet btn-block',

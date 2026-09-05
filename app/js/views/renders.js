@@ -54,18 +54,69 @@ function pickImages({ multiple = true } = {}) {
 }
 
 /**
+ * The makeup half of a look, in the shape it is stored.
+ *
+ * A render of the face is only half of what the owner needs to walk out the
+ * door wearing that face: the other half is what went where, in which shade,
+ * bought under which name. The beauty screen has all of it, and then loses it
+ * the moment the app is closed. So the look carries it — every step with its
+ * hex and its product names, plus the intensity the simulation was set to, so
+ * a saved look can reopen the same brief it was rendered from.
+ *
+ * Slimmed on purpose: the beauty response is kept, the transient bits are not.
+ */
+export function makeupRecord(makeup, intensity = 1) {
+  if (!makeup?.steps?.length) return null;
+  return {
+    look_key: makeup.look_key || null,
+    look_name_he: makeup.look_name_he || '', look_name_en: makeup.look_name_en || '',
+    duration_minutes: makeup.duration_minutes || null,
+    steps: makeup.steps.map(s => ({
+      area: s.area || '',
+      technique: s.technique || null,
+      finish: s.finish || null,
+      instruction_he: s.instruction_he || '', instruction_en: s.instruction_en || '',
+      product_type_he: s.product_type_he || '', product_type_en: s.product_type_en || '',
+      shade_he: s.shade_he || '', shade_en: s.shade_en || '',
+      shade_hex: s.shade_hex || null,
+      ref: s.ref || null, alt: s.alt || null,
+    })),
+    trend_note_he: makeup.trend_note_he || '', trend_note_en: makeup.trend_note_en || '',
+    longevity_tip_he: makeup.longevity_tip_he || '', longevity_tip_en: makeup.longevity_tip_en || '',
+    engine: makeup.engine || 'ai',
+    intensity: Number.isFinite(+intensity) ? +intensity : 1,
+    savedAt: Date.now(),
+  };
+}
+
+/** A look with its makeup stamped on — a no-op when there is nothing to stamp. */
+export function withMakeup(look, makeup, intensity = 1) {
+  const rec = makeupRecord(makeup, intensity);
+  if (!rec) return look;
+  return { ...look, makeup: rec, makeup_look: rec.look_key || look?.makeup_look || null };
+}
+
+/**
  * Attach images to a look, saving the look if it was never saved.
+ *
+ * Each shot may say what it is — `kind: 'outfit' | 'face'` — so the makeup
+ * render can be told apart from the outfit render on the shelf. When the
+ * makeup that was rendered is passed along, its details are saved on the same
+ * record in the same write: the picture and the steps that made it, together.
+ *
  * @returns the stored look record, or null.
  */
-export async function addRenders(look, shots) {
+export async function addRenders(look, shots, { makeup = null, intensity = 1 } = {}) {
   if (!shots?.length) return null;
+  const base = makeup ? withMakeup(look, makeup, intensity) : { ...look };
   const record = {
-    ...look,
+    ...base,
     id: look?.id || newId('look'),
     createdAt: look?.createdAt || Date.now(),
     renders: [...(look?.renders || []), ...shots.map(s => ({
       dataUrl: s.dataUrl || s,
       w: s.w || null, h: s.h || null,
+      kind: s.kind || null,
       addedAt: Date.now(),
     }))],
   };
@@ -143,6 +194,11 @@ export function renderStrip(look, { onChange } = {}) {
             src: r.dataUrl, alt: '', loading: 'lazy',
             style: { width: '100%', height: '116px', objectFit: 'cover', borderRadius: 'var(--r-sm)' },
           }),
+          // The face render is the makeup; say so, or two thumbnails of the
+          // same person read as one take and a retake.
+          r.kind === 'face' ? el('div', { class: 'micro', style: {
+            marginTop: '3px', textAlign: 'center', color: 'var(--oxblood)', fontWeight: 600,
+          }, text: t('render_face_tag') }) : null,
         )),
       ) : null,
       el('button', {
@@ -167,7 +223,7 @@ function openViewer(look, index, onChange) {
 
   let close = () => {};
   close = openSheet(el('div', {},
-    el('div', { class: 'eyebrow', text: t('render_one') }),
+    el('div', { class: 'eyebrow', text: r.kind === 'face' ? t('render_face_one') : t('render_one') }),
     el('img', {
       src: r.dataUrl, alt: '',
       style: { width: '100%', borderRadius: 'var(--r-md)', marginTop: 'var(--s3)', display: 'block' },

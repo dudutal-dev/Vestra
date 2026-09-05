@@ -231,14 +231,52 @@ export function openBrief({ kind, prompt, photos = [], look = null, makeup = nul
      manifest numbers them, go to the image model directly, and the picture
      lands on the look it was made for. The manual handover below survives as
      the free path and the second opinion. */
+
+  /* The blank look a render is filed under when it was made for none. */
+  const fallbackLook = (he, en) => ({
+    engine: 'photo',
+    title_he: he, title_en: en,
+    occasion_he: '', occasion_en: '',
+    items: [], palette: [], gaps: [],
+  });
+
+  /* Whatever was just saved becomes the caller's copy too. An unsaved look has
+     no id until this moment — give it the one the render was filed under, or
+     the next "save look" tap would shelve the same look twice. The makeup
+     travels the same way, so the studio card shows it without a reload. */
+  const adopt = (rec) => {
+    if (!look || !rec) return;
+    look.id = rec.id; look.createdAt = rec.createdAt; look.renders = rec.renders;
+    if (rec.makeup) { look.makeup = rec.makeup; look.makeup_look = rec.makeup_look; }
+  };
+
+  const showShot = (host, shot) => host.replaceChildren(
+    el('div', { class: 'eyebrow', style: { margin: 'var(--s3) 0 var(--s2)' }, text: t('brief_render_done') }),
+    el('img', { src: shot.dataUrl, alt: '',
+      style: { width: '100%', borderRadius: 'var(--r-md)', display: 'block' } }),
+  );
+
+  /* The outfit render shows makeup the way a full-length photo does — barely.
+     The face is where makeup reads, so it gets a render of its own: the
+     makeup instruction applied to the face close-up. Only possible where
+     there is a face photo to work on. */
+  const makeupSteps = (makeup?.steps || []).filter(s => s.instruction_he || s.instruction_en);
+  const canRenderFace = canRender && makeupSteps.length > 0 && !!state.face?.photo;
+  const renderFace = () => renderImage({
+    prompt: makeupPrompt({ look: makeup, face: state.face?.face || null, intensity }),
+    photos: [{ dataUrl: state.face.photo }],
+  });
+
   const preview = el('div');
+  const facePreview = el('div');
+
   /* `disabled` covers a tap while a render is running; this covers the tap
      that isn't one — mobile browsers can synthesise a second click from one
      touch (the classic ghost click), and each render here costs money. */
   let rendering = false;
   const renderBtn = canRender ? el('button', {
     class: 'btn btn-primary btn-block',
-    html: icon('sparkles') + `<span>${esc(t('brief_render_now'))}</span>`,
+    html: icon('sparkles') + `<span>${esc(kind === 'full' && canRenderFace ? t('brief_render_full') : t('brief_render_now'))}</span>`,
     onclick: async (e) => {
       if (rendering) return;
       rendering = true;
@@ -248,41 +286,49 @@ export function openBrief({ kind, prompt, photos = [], look = null, makeup = nul
       label.textContent = t('brief_rendering');
       try {
         const shot = await renderImage({ prompt, photos });
-        const rec = await addRenders(look || {
-          engine: 'photo',
-          title_he: 'הדמיה', title_en: 'Render',
-          occasion_he: '', occasion_en: '',
-          items: [], palette: [], gaps: [],
-        }, [shot]);
-        /* The caller's copy of an unsaved look has no id until this moment.
-           Give it the one the render was filed under, or the next "save look"
-           tap would shelve the same look twice. */
-        if (look && rec) { look.id = rec.id; look.createdAt = rec.createdAt; look.renders = rec.renders; }
         bumpRenderCount();
-        preview.replaceChildren(
-          el('div', { class: 'eyebrow', style: { margin: 'var(--s3) 0 var(--s2)' }, text: t('brief_render_done') }),
-          el('img', { src: shot.dataUrl, alt: '',
-            style: { width: '100%', borderRadius: 'var(--r-md)', display: 'block' } }),
-        );
+        showShot(preview, shot);
+        const shots = [{ ...shot, kind: kind === 'makeup' ? 'face' : 'outfit' }];
+
+        /* A look-plus-makeup simulation is two pictures, not one. The
+           full-length render is where the outfit reads and the face is where
+           the makeup does, so the second render is made in the same tap and
+           saved in the same write — the owner asked for the look with its
+           makeup, and a saved look with half of it is not that. A failed face
+           render does not cost the outfit render: it is saved regardless and
+           the face can be retried from its own button below. */
+        let faceFailed = false;
+        if (kind === 'full' && canRenderFace) {
+          label.textContent = t('brief_rendering_face');
+          try {
+            const faceShot = await renderFace();
+            bumpRenderCount();
+            showShot(facePreview, faceShot);
+            shots.push({ ...faceShot, kind: 'face' });
+          } catch {
+            faceFailed = true;
+          }
+        }
+
+        const rec = await addRenders(look || fallbackLook('הדמיה', 'Render'), shots,
+          { makeup: kind === 'tryon' ? null : makeup, intensity });
+        adopt(rec);
         buzz(14);
-        toast(t('brief_render_done'));
+        toast(faceFailed ? t('brief_render_face_failed') : t('brief_render_done'), faceFailed ? 'warn' : '');
       } catch (err) {
         toast(errText(err), 'warn');
       }
-      label.textContent = t('brief_render_now');
+      label.textContent = kind === 'full' && canRenderFace ? t('brief_render_full') : t('brief_render_now');
       btn.disabled = false;
       rendering = false;
     },
   }) : null;
 
-  /* The outfit render shows makeup the way a full-length photo does — barely.
-     The face is where makeup reads, so it gets a render of its own: the
-     makeup instruction applied to the face close-up, filed onto the same
-     look. Only offered where there is a face photo to work on. */
-  const facePreview = el('div');
-  const makeupSteps = (makeup?.steps || []).filter(s => s.instruction_he || s.instruction_en);
+  /* The face on its own — a retake of the makeup when the full render's face
+     came back wrong, or when it failed. Filed onto the same look, with the
+     makeup details beside it. */
   let faceRendering = false;
-  const faceBtn = canRender && kind === 'full' && makeupSteps.length && state.face?.photo ? el('button', {
+  const faceBtn = canRenderFace && kind === 'full' ? el('button', {
     class: 'btn btn-quiet btn-block', style: { marginTop: 'var(--s2)' },
     html: icon('sparkles') + `<span>${esc(t('brief_render_face'))}</span>`,
     onclick: async (e) => {
@@ -293,23 +339,12 @@ export function openBrief({ kind, prompt, photos = [], look = null, makeup = nul
       btn.disabled = true;
       label.textContent = t('brief_rendering');
       try {
-        const shot = await renderImage({
-          prompt: makeupPrompt({ look: makeup, face: state.face?.face || null, intensity }),
-          photos: [{ dataUrl: state.face.photo }],
-        });
-        const rec = await addRenders(look || {
-          engine: 'photo',
-          title_he: 'הדמיית איפור', title_en: 'Makeup render',
-          occasion_he: '', occasion_en: '',
-          items: [], palette: [], gaps: [],
-        }, [shot]);
-        if (look && rec) { look.id = rec.id; look.createdAt = rec.createdAt; look.renders = rec.renders; }
+        const shot = await renderFace();
         bumpRenderCount();
-        facePreview.replaceChildren(
-          el('div', { class: 'eyebrow', style: { margin: 'var(--s3) 0 var(--s2)' }, text: t('brief_render_done') }),
-          el('img', { src: shot.dataUrl, alt: '',
-            style: { width: '100%', borderRadius: 'var(--r-md)', display: 'block' } }),
-        );
+        const rec = await addRenders(look || fallbackLook('הדמיית איפור', 'Makeup render'),
+          [{ ...shot, kind: 'face' }], { makeup, intensity });
+        adopt(rec);
+        showShot(facePreview, shot);
         buzz(14);
         toast(t('brief_render_done'));
       } catch (err) {
@@ -385,7 +420,7 @@ export function openBrief({ kind, prompt, photos = [], look = null, makeup = nul
     el('div', { class: 'eyebrow', text: kind === 'makeup' ? t('brief_makeup') : kind === 'full' ? t('brief_full') : t('brief_tryon') }),
     el('h3', { style: { marginBlock: '6px var(--s3)' }, text: t('brief_title') }),
     el('p', { class: 'tiny muted', style: { marginBottom: 'var(--s4)' },
-      text: renderBtn ? t('brief_render_how') : shareBtn ? t('brief_share_how') : t('brief_how') }),
+      text: renderBtn ? (kind === 'full' && canRenderFace ? t('brief_render_how_full') : t('brief_render_how')) : shareBtn ? t('brief_share_how') : t('brief_how') }),
 
     renderBtn,
     preview,
